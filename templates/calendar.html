@@ -1,38 +1,41 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>カレンダーアプリ</title>
-    <style>
-        .calendar {
-            font-family: Arial, sans-serif;
-            margin: 20px auto;
-            max-width: 800px;
-        }
-        .month {
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 10px;
-            text-align: center;
-            border: 1px solid #ddd;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-    </style>
-</head>
-<body>
-    <div class="calendar">
-        {{ calendar_html|safe }}
-    </div>
-    <div class="navigation">
-        <a href="/?year={{ year }}&month={{ month-1 }}">前月</a>
-        <span>{{ year }}年{{ month }}月</span>
-        <a href="/?year={{ year }}&month={{ month+1 }}">次月</a>
-    </div>
-</body>
-</html>
+<style>
+.navigation {
+    text-align: center;
+    margin: 20px 0;
+    font-size: 1.2em;
+}
+.navigation a {
+    display: inline-block;
+    padding: 8px 16px;
+    margin: 0 10px;
+    background-color: #f2f2f2;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #333;
+    transition: background-color 0.3s;
+}
+.navigation a:hover {
+    background-color: #ddd;
+}
+.current-month {
+    font-weight: bold;
+    font-size: 1.3em;
+}
+</style>
+<select onchange="location.href='/?year='+this.value+'&month={{ month }}'">
+    {% for y in range(year-5, year+6) %}
+    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}年</option>
+    {% endfor %}
+</select>
+
+<select onchange="location.href='/?year={{ year }}&month='+this.value">
+    {% for m in range(1, 13) %}
+    <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}月</option>
+    {% endfor %}
+</select>
+<div class="navigation">
+    <a href="/?year={{ year }}&month={{ month-1 }}">前月</a>
+    <span class="current-month">{{ year }}年{{ month }}月</span>
+    <a href="/?year={{ year }}&month={{ month+1 }}">次月</a>
+    <a href="/" class="today-button">今日</a>
+</div>
