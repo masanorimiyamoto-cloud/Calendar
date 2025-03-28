@@ -1,3 +1,4 @@
+#app.py
 from flask import Flask, render_template, request
 import calendar
 from datetime import datetime
@@ -24,6 +25,20 @@ def show_calendar():
                          calendar_html=html_calendar,
                          year=year,
                          month=month)
+class CustomHTMLCalendar(calendar.HTMLCalendar):
+    def formatday(self, day, weekday):
+        today = datetime.now()
+        if day == 0:
+            return '<td class="noday">&nbsp;</td>'
+        elif day == today.day and self.month == today.month and self.year == today.year:
+            return f'<td class="today">{day}</td>'
+        else:
+            return f'<td>{day}</td>'
+    
+    def formatmonth(self, year, month, withyear=True):
+        self.year = year
+        self.month = month
+        return super().formatmonth(year, month, withyear)
 
 if __name__ == '__main__':
     app.run()
