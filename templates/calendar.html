@@ -2,13 +2,37 @@
 <html>
 <head>
     <title>カレンダーアプリ</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .calendar {
+            font-family: Arial, sans-serif;
+            margin: 20px auto;
+            max-width: 800px;
+        }
+        .month {
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
 </head>
 <body>
-    <h1>Flaskカレンダー</h1>
-    <div id="calendar">
-        <!-- Flaskからデータを受け取る部分 -->
-        {{ calendar_html | safe }}
+    <div class="calendar">
+        {{ calendar_html|safe }}
+    </div>
+    <div class="navigation">
+        <a href="/?year={{ year }}&month={{ month-1 }}">前月</a>
+        <span>{{ year }}年{{ month }}月</span>
+        <a href="/?year={{ year }}&month={{ month+1 }}">次月</a>
     </div>
 </body>
 </html>
