@@ -1,41 +1,67 @@
-<style>
-.navigation {
-    text-align: center;
-    margin: 20px 0;
-    font-size: 1.2em;
-}
-.navigation a {
-    display: inline-block;
-    padding: 8px 16px;
-    margin: 0 10px;
-    background-color: #f2f2f2;
-    border-radius: 4px;
-    text-decoration: none;
-    color: #333;
-    transition: background-color 0.3s;
-}
-.navigation a:hover {
-    background-color: #ddd;
-}
-.current-month {
-    font-weight: bold;
-    font-size: 1.3em;
-}
-</style>
-<select onchange="location.href='/?year='+this.value+'&month={{ month }}'">
-    {% for y in range(year-5, year+6) %}
-    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}年</option>
-    {% endfor %}
-</select>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ year }}年{{ month }}月のカレンダー</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            text-align: center;
+            padding: 8px;
+        }
+        .navigation {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.2em;
+        }
+        .navigation a {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 0 10px;
+            background-color: #f2f2f2;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #333;
+            transition: background-color 0.3s;
+        }
+        .navigation a:hover {
+            background-color: #ddd;
+        }
+        .current-month {
+            font-weight: bold;
+            font-size: 1.3em;
+        }
+    </style>
+</head>
+<body>
+    <div class="navigation">
+        <a href="/?year={{ year }}&month={{ month - 1 }}">前月</a>
+        <span class="current-month">{{ year }}年{{ month }}月</span>
+        <a href="/?year={{ year }}&month={{ month + 1 }}">次月</a>
+        <a href="/" class="today-button">今日</a>
+    </div>
 
-<select onchange="location.href='/?year={{ year }}&month='+this.value">
-    {% for m in range(1, 13) %}
-    <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}月</option>
-    {% endfor %}
-</select>
-<div class="navigation">
-    <a href="/?year={{ year }}&month={{ month-1 }}">前月</a>
-    <span class="current-month">{{ year }}年{{ month }}月</span>
-    <a href="/?year={{ year }}&month={{ month+1 }}">次月</a>
-    <a href="/" class="today-button">今日</a>
-</div>
+    <div style="text-align: center; margin-bottom: 10px;">
+        <form method="get" action="/">
+            <select name="year" onchange="this.form.submit()">
+                {% for y in range(year - 5, year + 6) %}
+                <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}年</option>
+                {% endfor %}
+            </select>
+            <select name="month" onchange="this.form.submit()">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}月</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+
+    <div>
+        {{ calendar_html | safe }}
+    </div>
+</body>
+</html>
