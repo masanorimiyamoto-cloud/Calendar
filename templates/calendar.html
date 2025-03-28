@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>カレンダーアプリ</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Flaskカレンダー</h1>
+    <div id="calendar">
+        <!-- Flaskからデータを受け取る部分 -->
+        {{ calendar_html | safe }}
+    </div>
+</body>
+</html>
