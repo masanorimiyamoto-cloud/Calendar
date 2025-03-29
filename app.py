@@ -92,5 +92,8 @@ def event_detail(event_id):
     event = Event.query.get_or_404(event_id)
     return render_template('event_detail.html', event=event)
 
+# サーバーレス環境向けにエクスポート
+application = app
+
 if __name__ == '__main__':
     app.run(debug=True)
