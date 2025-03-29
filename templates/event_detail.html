@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ event.title }}</title>
+</head>
+<body>
+  <h1>{{ event.title }}</h1>
+  <p>日付: {{ event.date.strftime('%Y-%m-%d') }}</p>
+  <p>{{ event.description }}</p>
+  <a href="/">カレンダーに戻る</a>
+</body>
+</html>

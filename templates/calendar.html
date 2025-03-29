@@ -12,6 +12,19 @@
             border: 1px solid #ccc;
             text-align: center;
             padding: 8px;
+            height: 70px;
+            vertical-align: top;
+        }
+        .holiday {
+            color: red;
+            font-weight: bold;
+        }
+        .prev-month, .next-month {
+            color: #aaa;
+        }
+        .today {
+            background-color: #ffeb3b;
+            font-weight: bold;
         }
         .navigation {
             text-align: center;
@@ -35,6 +48,13 @@
             font-weight: bold;
             font-size: 1.3em;
         }
+        .event {
+            font-size: 0.6em;
+            background-color: #d9edf7;
+            margin-top: 2px;
+            padding: 2px;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
@@ -43,6 +63,7 @@
         <span class="current-month">{{ year }}年{{ month }}月</span>
         <a href="/?year={{ year }}&month={{ month + 1 }}">次月</a>
         <a href="/" class="today-button">今日</a>
+        <a href="/event/add">イベント追加</a>
     </div>
 
     <div style="text-align: center; margin-bottom: 10px;">
@@ -60,8 +81,43 @@
         </form>
     </div>
 
-    <div>
-        {{ calendar_html | safe }}
-    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>日</th>
+                <th>月</th>
+                <th>火</th>
+                <th>水</th>
+                <th>木</th>
+                <th>金</th>
+                <th>土</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for week in month_days %}
+            <tr>
+                {% for day in week %}
+                {% set d = day['date'] %}
+                <td class="
+                    {% if not day.in_month %}{{ 'prev-month' if d < today else 'next-month' }}{% endif %}
+                    {% if day.is_today %} today{% endif %}
+                    {% if day.is_holiday %} holiday{% endif %}
+                ">
+                    {{ d.day }}
+                    {% if day.is_holiday %}
+                        <div style="font-size: 0.6em;">{{ day.holiday_name }}</div>
+                    {% endif %}
+                    {% for event in day.events %}
+                        <div class="event">
+                            <a href="/event/{{ event.id }}">{{ event.title }}</a>
+                        </div>
+                    {% endfor %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
 </body>
 </html>

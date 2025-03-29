@@ -1,0 +1,23 @@
+
+#add_event.html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>イベント追加</title>
+</head>
+<body>
+    <h1>イベント追加</h1>
+    <form method="post">
+        <label for="date">日付 (YYYY-MM-DD):</label>
+        <input type="text" name="date" required><br><br>
+        <label for="title">タイトル:</label>
+        <input type="text" name="title" required><br><br>
+        <label for="description">説明:</label>
+        <textarea name="description"></textarea><br><br>
+        <button type="submit">追加</button>
+    </form>
+    <br>
+    <a href="/">カレンダーに戻る</a>
+</body>
+</html>
