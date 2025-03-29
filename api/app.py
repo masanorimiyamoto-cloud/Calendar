@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template, request, redirect
 import calendar
 from datetime import datetime
@@ -5,9 +6,13 @@ import jpholiday
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///events.db'
+
+# PostgreSQL 用の設定
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///events.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+
 
 # イベントモデル
 class Event(db.Model):
