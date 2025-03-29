@@ -97,8 +97,6 @@ def event_detail(event_id):
     event = Event.query.get_or_404(event_id)
     return render_template('event_detail.html', event=event)
 
-# サーバーレス環境向けにエクスポート
-application = app
-
-#if __name__ == '__main__':
- #   app.run(debug=True)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
