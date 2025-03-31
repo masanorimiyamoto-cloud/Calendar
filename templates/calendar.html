@@ -1,123 +1,133 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>{{ year }}年{{ month }}月のカレンダー</title>
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            border: 1px solid #ccc;
-            text-align: center;
-            padding: 8px;
-            height: 70px;
-            vertical-align: top;
-        }
-        .holiday {
-            color: red;
-            font-weight: bold;
-        }
-        .prev-month, .next-month {
-            color: #aaa;
-        }
-        .today {
-            background-color: #ffeb3b;
-            font-weight: bold;
-        }
-        .navigation {
-            text-align: center;
-            margin: 20px 0;
-            font-size: 1.2em;
-        }
-        .navigation a {
-            display: inline-block;
-            padding: 8px 16px;
-            margin: 0 10px;
-            background-color: #f2f2f2;
-            border-radius: 4px;
-            text-decoration: none;
-            color: #333;
-            transition: background-color 0.3s;
-        }
-        .navigation a:hover {
-            background-color: #ddd;
-        }
-        .current-month {
-            font-weight: bold;
-            font-size: 1.3em;
-        }
-        .event {
-            font-size: 0.6em;
-            background-color: #d9edf7;
-            margin-top: 2px;
-            padding: 2px;
-            border-radius: 3px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>{{ year }}年{{ month }}月のカレンダー</title>
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .holiday { color: #dc3545; font-weight: bold; }
+    .calendar-table td { height: 120px; vertical-align: top; border: 1px solid #dee2e6; }
+    .calendar-table th { background-color: #f8f9fa; }
+    .today { background-color: #fff3cd; }
+    .prev-month, .next-month { color: #6c757d; }
+    .event-card { margin: 2px 0; }
+
+    /* セルに押された感覚を追加 */
+    .calendar-cell {
+      transition: transform 0.1s ease, background-color 0.1s ease;
+      cursor: pointer;
+    }
+    .calendar-cell.pressed {
+      transform: scale(0.97);
+      background-color: #e9ecef;
+    }
+  </style>
 </head>
 <body>
-    <div class="navigation">
-        <a href="/?year={{ year }}&month={{ month - 1 }}">前月</a>
-        <span class="current-month">{{ year }}年{{ month }}月</span>
-        <a href="/?year={{ year }}&month={{ month + 1 }}">次月</a>
-        <a href="/" class="today-button">今日</a>
-        <a href="/event/add">イベント追加</a>
+  <!-- ナビゲーションバー -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container">
+      <a class="navbar-brand" href="/">カレンダー</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" 
+              aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+         <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="/event/add">イベント追加</a></li>
+        </ul>
+      </div>
     </div>
-
-    <div style="text-align: center; margin-bottom: 10px;">
-        <form method="get" action="/">
-            <select name="year" onchange="this.form.submit()">
-                {% for y in range(year - 5, year + 6) %}
-                <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}年</option>
-                {% endfor %}
-            </select>
-            <select name="month" onchange="this.form.submit()">
-                {% for m in range(1, 13) %}
-                <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}月</option>
-                {% endfor %}
-            </select>
-        </form>
+  </nav>
+  <div class="container mt-4">
+    <!-- 年月ナビゲーション -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <a href="/?year={{ year }}&month={{ month - 1 }}" class="btn btn-outline-secondary">前月</a>
+      <h2>{{ year }}年{{ month }}月</h2>
+      <a href="/?year={{ year }}&month={{ month + 1 }}" class="btn btn-outline-secondary">次月</a>
     </div>
-
-    <table>
+    <div class="text-center mb-4">
+      <a href="/" class="btn btn-info me-2">今日</a>
+      <a href="/event/add" class="btn btn-primary">イベント追加</a>
+    </div>
+    <!-- 年・月セレクタ -->
+    <form method="get" action="/" class="d-flex justify-content-center mb-4">
+      <select name="year" class="form-select w-auto me-2" onchange="this.form.submit()">
+        {% for y in range(year - 5, year + 6) %}
+        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}年</option>
+        {% endfor %}
+      </select>
+      <select name="month" class="form-select w-auto" onchange="this.form.submit()">
+        {% for m in range(1, 13) %}
+        <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}月</option>
+        {% endfor %}
+      </select>
+    </form>
+    <!-- カレンダー表示 -->
+    <div class="table-responsive">
+      <table class="table calendar-table">
         <thead>
-            <tr>
-                <th>日</th>
-                <th>月</th>
-                <th>火</th>
-                <th>水</th>
-                <th>木</th>
-                <th>金</th>
-                <th>土</th>
-            </tr>
+          <tr>
+            <th>日</th>
+            <th>月</th>
+            <th>火</th>
+            <th>水</th>
+            <th>木</th>
+            <th>金</th>
+            <th>土</th>
+          </tr>
         </thead>
         <tbody>
-            {% for week in month_days %}
-            <tr>
-                {% for day in week %}
-                {% set d = day['date'] %}
-                <td class="
-                    {% if not day.in_month %}{{ 'prev-month' if d < today else 'next-month' }}{% endif %}
-                    {% if day.is_today %} today{% endif %}
-                    {% if day.is_holiday %} holiday{% endif %}
-                ">
-                    {{ d.day }}
-                    {% if day.is_holiday %}
-                        <div style="font-size: 0.6em;">{{ day.holiday_name }}</div>
-                    {% endif %}
-                    {% for event in day.events %}
-                        <div class="event">
-                            <a href="/event/{{ event.id }}">{{ event.title }}</a>
-                        </div>
-                    {% endfor %}
-                </td>
-                {% endfor %}
-            </tr>
+          {% for week in month_days %}
+          <tr>
+            {% for day in week %}
+            {% set d = day['date'] %}
+            <td class="calendar-cell 
+              {% if not day.in_month %}prev-month{% endif %}
+              {% if day.is_today %}today{% endif %}
+              {% if day.is_holiday %}holiday{% endif %}
+            ">
+              <div class="fw-bold">{{ d.day }}</div>
+              {% if day.is_holiday %}
+                <div class="small">{{ day.holiday_name }}</div>
+              {% endif %}
+              {% for event in day.events %}
+                <div class="card event-card">
+                  <div class="card-body p-1">
+                    <a href="/event/{{ event.id }}" class="card-link small text-decoration-none">{{ event.title }}</a>
+                  </div>
+                </div>
+              {% endfor %}
+            </td>
             {% endfor %}
+          </tr>
+          {% endfor %}
         </tbody>
-    </table>
-    
+      </table>
+    </div>
+  </div>
+  <footer class="text-center py-3 bg-light mt-4">
+    <div class="container">
+      <small>&copy; {{ year }} カレンダーアプリ</small>
+    </div>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- クリック時に「押された」感覚を与えるスクリプト -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const cells = document.querySelectorAll(".calendar-cell");
+      cells.forEach(cell => {
+        cell.addEventListener("click", function(e) {
+          // セル内のリンクをクリックした場合はリンク処理を優先するため、エフェクトは付与しない
+          if (e.target.tagName.toLowerCase() === 'a') return;
+          cell.classList.add("pressed");
+          setTimeout(() => {
+            cell.classList.remove("pressed");
+          }, 150);
+        });
+      });
+    });
+  </script>
 </body>
 </html>
