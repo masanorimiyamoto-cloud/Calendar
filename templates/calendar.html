@@ -13,10 +13,9 @@
     .prev-month, .next-month { color: #6c757d; }
     .event-card { margin: 2px 0; }
 
-    /* 日曜日を赤、土曜日を青に */
+    /* 曜日の色設定：日曜日を赤、土曜日を青 */
     .sunday { color: red !important; }
     .saturday { color: blue !important; }
-
 
     /* セルに押された感覚を追加 */
     .calendar-cell {
@@ -92,16 +91,21 @@
               {% if not day.in_month %}prev-month{% endif %}
               {% if day.is_today %} today{% endif %}
               {% if day.is_holiday %} holiday{% endif %}
-              {% if loop.index0 == 0 %} sunday{% elif loop.index0 == 6 %} saturday{% endif %}
-            ">
+              {% if d.weekday() == 6 %} sunday{% elif d.weekday() == 5 %} saturday{% endif %}">
               <div class="fw-bold">{{ d.day }}</div>
               {% if day.is_holiday %}
                 <div class="small">{{ day.holiday_name }}</div>
               {% endif %}
               {% for event in day.events %}
+                <!-- イベントリンクに data 属性を追加 -->
                 <div class="card event-card">
                   <div class="card-body p-1">
-                    <a href="/event/{{ event.id }}" class="card-link small text-decoration-none">{{ event.title }}</a>
+                    <a href="#" class="card-link small text-decoration-none event-link"
+                       data-title="{{ event.title }}"
+                       data-date="{{ event.date.strftime('%Y-%m-%d') }}"
+                       data-description="{{ event.description }}">
+                      {{ event.title }}
+                    </a>
                   </div>
                 </div>
               {% endfor %}
@@ -113,24 +117,56 @@
       </table>
     </div>
   </div>
+
+  <!-- Event Detail Modal -->
+  <div class="modal fade" id="eventDetailModal" tabindex="-1" aria-labelledby="eventDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="eventDetailModalLabel"></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+        </div>
+        <div class="modal-body">
+          <p id="eventDate"></p>
+          <p id="eventDescription"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer class="text-center py-3 bg-light mt-4">
     <div class="container">
-      <small>&copy; {{ year }} カレンダーアプリ2025.4.1</small>
+      <small>&copy; {{ year }} カレンダーアプリ</small>
     </div>
   </footer>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <!-- クリック時に「押された」感覚を与えるスクリプト -->
   <script>
     document.addEventListener("DOMContentLoaded", function() {
+      // セルの押下エフェクト
       const cells = document.querySelectorAll(".calendar-cell");
       cells.forEach(cell => {
         cell.addEventListener("click", function(e) {
-          // セル内のリンクをクリックした場合はリンク処理を優先するため、エフェクトは付与しない
           if (e.target.tagName.toLowerCase() === 'a') return;
           cell.classList.add("pressed");
-          setTimeout(() => {
-            cell.classList.remove("pressed");
-          }, 150);
+          setTimeout(() => { cell.classList.remove("pressed"); }, 150);
+        });
+      });
+      // イベントリンククリック時にモーダル表示
+      const eventLinks = document.querySelectorAll(".event-link");
+      eventLinks.forEach(link => {
+        link.addEventListener("click", function(e) {
+          e.preventDefault();
+          const title = this.dataset.title;
+          const date = this.dataset.date;
+          const description = this.dataset.description;
+          document.getElementById("eventDetailModalLabel").innerText = title;
+          document.getElementById("eventDate").innerText = "日付: " + date;
+          document.getElementById("eventDescription").innerText = description;
+          new bootstrap.Modal(document.getElementById("eventDetailModal")).show();
         });
       });
     });
