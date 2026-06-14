@@ -8,8 +8,13 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-# PostgreSQL 用の設定
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///events.db').replace('postgres://', 'postgresql://')
+# データベース設定
+# 本番(Vercel)では環境変数 DATABASE_URL に PostgreSQL の接続文字列を設定する。
+# 未設定の場合はローカル開発用に SQLite を使う。
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///events.db')
+# Heroku/旧式の "postgres://" を SQLAlchemy が要求する "postgresql://" に変換
+database_url = database_url.replace('postgres://', 'postgresql://')
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 MAX_PARTICIPANTS = 4
 
@@ -47,8 +52,13 @@ class Participant(db.Model):
 
 
 # 初回実行時にDBテーブルを作成
+# Vercel のサーバーレス環境ではファイルシステムが読み取り専用のため、
+# SQLite へのフォールバック時などに create_all が失敗してもアプリ起動を止めない。
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning('db.create_all() をスキップしました: %s', exc)
 
 
 @app.route('/')
