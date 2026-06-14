@@ -5,6 +5,7 @@ import calendar
 from datetime import datetime
 import jpholiday
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.pool import NullPool
 
 app = Flask(__name__)
 
@@ -16,6 +17,15 @@ database_url = os.environ.get('DATABASE_URL', 'sqlite:///events.db')
 database_url = database_url.replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Vercel などのサーバーレス環境向けの接続設定。
+# 関数が凍結される間に Neon 側がアイドル接続を閉じるため、接続をプールに溜めず
+# 毎回新しく張り(NullPool)、使用前に死活確認(pool_pre_ping)して
+# "SSL connection has been closed unexpectedly" を防ぐ。
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'poolclass': NullPool,
+    'pool_pre_ping': True,
+}
 MAX_PARTICIPANTS = 4
 
 db = SQLAlchemy(app)
