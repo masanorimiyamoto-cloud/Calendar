@@ -61,6 +61,12 @@ class Participant(db.Model):
     )
 
 
+class Member(db.Model):
+    """出欠表に並べる固定メンバーの名簿。"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+
+
 # 初回実行時にDBテーブルを作成
 # Vercel のサーバーレス環境ではファイルシステムが読み取り専用のため、
 # SQLite へのフォールバック時などに create_all が失敗してもアプリ起動を止めない。
@@ -146,47 +152,81 @@ def add_event():
 def event_detail(event_id):
     event = Event.query.get_or_404(event_id)
     error_message = None
-    success_message = None
 
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        attending = request.form.get('attending') == '1'
+        # 出欠表からの操作: member_name と status('attend'/'absent'/'undecided')
+        name = request.form.get('member_name', '').strip()
+        status = request.form.get('status', '')
 
-        if not name:
-            error_message = '名前を入力してください。'
-        elif attending and event.attending_count >= MAX_PARTICIPANTS and not any(
-            participant.name == name and participant.attending for participant in event.participants
-        ):
-            error_message = f'参加者は最大 {MAX_PARTICIPANTS} 名までです。'
-        else:
-            participant = Participant.query.filter_by(event_id=event.id, name=name).first()
+        member = Member.query.filter_by(name=name).first()
+        participant = Participant.query.filter_by(event_id=event.id, name=name).first()
+
+        if not member:
+            error_message = 'メンバーが見つかりません。'
+        elif status == 'undecided':
+            # 未定 = 出欠記録を削除
             if participant:
-                participant.attending = attending
-                success_message = f'{name} さんの参加ステータスを更新しました。'
+                db.session.delete(participant)
+            db.session.commit()
+            return redirect(url_for('event_detail', event_id=event.id))
+        elif status in ('attend', 'absent'):
+            attending = status == 'attend'
+            already_attending = participant.attending if participant else False
+            # 新たに「参加」にする時だけ定員チェック
+            if attending and not already_attending and event.attending_count >= MAX_PARTICIPANTS:
+                error_message = f'参加は最大 {MAX_PARTICIPANTS} 名までです。'
             else:
-                participant = Participant(event=event, name=name, attending=attending)
-                db.session.add(participant)
-                success_message = f'{name} さんを登録しました。'
-
-            if not error_message:
+                if participant:
+                    participant.attending = attending
+                else:
+                    participant = Participant(event=event, name=name, attending=attending)
+                    db.session.add(participant)
                 db.session.commit()
                 return redirect(url_for('event_detail', event_id=event.id))
+        else:
+            error_message = '不正な操作です。'
+
+    # 出欠表の行データを作成（未登録メンバーは「未定」）
+    status_by_name = {
+        p.name: ('attend' if p.attending else 'absent') for p in event.participants
+    }
+    members = Member.query.order_by(Member.id).all()
+    member_rows = [
+        {'name': m.name, 'status': status_by_name.get(m.name, 'undecided')}
+        for m in members
+    ]
 
     return render_template(
         'event_detail.html',
         event=event,
         max_participants=MAX_PARTICIPANTS,
+        member_rows=member_rows,
+        has_members=bool(members),
         error_message=error_message,
-        success_message=success_message
     )
 
 
-@app.route('/event/<int:event_id>/participant/<int:participant_id>/delete', methods=['POST'])
-def delete_participant(event_id, participant_id):
-    participant = Participant.query.filter_by(id=participant_id, event_id=event_id).first_or_404()
-    db.session.delete(participant)
+@app.route('/members', methods=['GET'])
+def members():
+    member_list = Member.query.order_by(Member.id).all()
+    return render_template('members.html', members=member_list)
+
+
+@app.route('/members/add', methods=['POST'])
+def add_member():
+    name = request.form.get('name', '').strip()
+    if name and not Member.query.filter_by(name=name).first():
+        db.session.add(Member(name=name))
+        db.session.commit()
+    return redirect(url_for('members'))
+
+
+@app.route('/members/<int:member_id>/delete', methods=['POST'])
+def delete_member(member_id):
+    member = Member.query.get_or_404(member_id)
+    db.session.delete(member)
     db.session.commit()
-    return redirect(url_for('event_detail', event_id=event_id))
+    return redirect(url_for('members'))
 
 
 if __name__ == "__main__":

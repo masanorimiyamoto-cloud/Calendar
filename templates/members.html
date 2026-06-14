@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>メンバー管理</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container">
+      <a class="navbar-brand" href="/">カレンダー</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="/">ホーム</a></li>
+          <li class="nav-item"><a class="nav-link active" href="{{ url_for('members') }}">メンバー管理</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  <div class="container mt-4">
+    <div class="card">
+      <div class="card-header">メンバー管理</div>
+      <div class="card-body">
+        <p class="text-muted">ここで登録した人が、各予約の出欠表に並びます。</p>
+
+        <form method="post" action="{{ url_for('add_member') }}" class="row g-2 mb-4">
+          <div class="col-auto flex-grow-1">
+            <input type="text" name="name" class="form-control" placeholder="メンバーの名前" required>
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-primary">追加</button>
+          </div>
+        </form>
+
+        <h5>登録済みメンバー（{{ members|length }}名）</h5>
+        <ul class="list-group mb-3">
+          {% for member in members %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>{{ member.name }}</span>
+            <form method="post" action="{{ url_for('delete_member', member_id=member.id) }}"
+                  onsubmit="return confirm('{{ member.name }} さんを削除しますか？');" style="margin:0;">
+              <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
+            </form>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">まだメンバーが登録されていません。</li>
+          {% endfor %}
+        </ul>
+
+        <a href="/" class="btn btn-secondary">カレンダーに戻る</a>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
