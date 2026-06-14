@@ -20,21 +20,21 @@
   <div class="container mt-4">
     <div class="card">
       <div class="card-header">
-        イベント追加
+        コート予約を追加
       </div>
       <div class="card-body">
         <form method="post">
           <div class="mb-3">
-            <label for="date" class="form-label">日付 (YYYY-MM-DD):</label>
-            <input type="text" name="date" class="form-control" required>
+            <label for="date" class="form-label">予約日:</label>
+            <input type="date" name="date" class="form-control" value="{{ date }}" required>
           </div>
           <div class="mb-3">
             <label for="title" class="form-label">タイトル:</label>
-            <input type="text" name="title" class="form-control" required>
+            <input type="text" name="title" class="form-control" placeholder="テニスコート予約" required>
           </div>
           <div class="mb-3">
             <label for="description" class="form-label">説明:</label>
-            <textarea name="description" class="form-control"></textarea>
+            <textarea name="description" class="form-control" placeholder="人数、時間、備考など"></textarea>
           </div>
           <button type="submit" class="btn btn-primary">追加</button>
         </form>

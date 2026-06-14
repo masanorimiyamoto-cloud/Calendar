@@ -20,12 +20,54 @@
   <div class="container mt-4">
     <div class="card">
       <div class="card-header">
-        イベント詳細
+        予約詳細
       </div>
       <div class="card-body">
         <h3 class="card-title">{{ event.title }}</h3>
         <p class="card-text">日付: {{ event.date.strftime('%Y-%m-%d') }}</p>
         <p class="card-text">{{ event.description }}</p>
+        <p class="card-text">
+          参加者: {{ event.attending_count }} / {{ max_participants }}
+        </p>
+
+        {% if success_message %}
+        <div class="alert alert-success">{{ success_message }}</div>
+        {% endif %}
+        {% if error_message %}
+        <div class="alert alert-danger">{{ error_message }}</div>
+        {% endif %}
+
+        <form method="post" class="mb-4">
+          <div class="mb-3">
+            <label for="name" class="form-label">あなたの名前</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">参加ステータス</label>
+            <select name="attending" class="form-select">
+              <option value="1">参加する</option>
+              <option value="0">不参加</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">登録</button>
+        </form>
+
+        <h5>登録済み参加者</h5>
+        <ul class="list-group mb-3">
+          {% for participant in event.participants %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              {{ participant.name }} - {% if participant.attending %}<span class="text-success">参加</span>{% else %}<span class="text-secondary">不参加</span>{% endif %}
+            </div>
+            <form method="post" action="/event/{{ event.id }}/participant/{{ participant.id }}/delete" style="margin:0;">
+              <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
+            </form>
+          </li>
+          {% else %}
+          <li class="list-group-item text-muted">まだ参加者が登録されていません。</li>
+          {% endfor %}
+        </ul>
+
         <a href="/" class="btn btn-secondary">カレンダーに戻る</a>
       </div>
     </div>
