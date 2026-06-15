@@ -23,7 +23,8 @@
     }
     .calendar-cell:hover { background-color: #f8f9fa; }
     .calendar-cell.pressed { transform: scale(0.98); background-color: #e9ecef; }
-    .today { background-color: #fff3cd; }
+    .today { background-color: #fff3cd; outline: 2px solid #ffc107; outline-offset: -2px; }
+    .today-badge { font-size: 0.68rem; vertical-align: middle; }
     .holiday, .sunday { color: #dc3545; }
     .saturday { color: #0d6efd; }
     .prev-month, .next-month { color: #6c757d; background-color: #fafafa; }
@@ -142,7 +143,12 @@
               {% if day.is_holiday %} holiday{% endif %}
               {% if d.weekday() == 6 %} sunday{% elif d.weekday() == 5 %} saturday{% endif %}"
               {% if event %}data-event-id="{{ event.id }}"{% endif %}>
-              <div class="fw-bold">{{ d.day }}</div>
+              <div class="fw-bold">
+                {{ d.day }}
+                {% if day.is_today %}
+                <span class="badge rounded-pill bg-warning text-dark today-badge">今日</span>
+                {% endif %}
+              </div>
               {% if day.is_holiday %}
               <div class="small">{{ day.holiday_name }}</div>
               {% endif %}
