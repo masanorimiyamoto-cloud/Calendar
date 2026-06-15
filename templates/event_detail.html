@@ -115,6 +115,10 @@
   <script>
     const eventId = "{{ event.id }}";
     const eventSeenKey = "eventSeenVersion:" + eventId;
+    const knownEventsKey = "knownEventIds";
+    const knownEvents = new Set(JSON.parse(localStorage.getItem(knownEventsKey) || "[]"));
+    knownEvents.add(eventId);
+    localStorage.setItem(knownEventsKey, JSON.stringify(Array.from(knownEvents)));
     localStorage.setItem(eventSeenKey, "{{ event.change_version or 0 }}");
 
     const statusLabels = {
