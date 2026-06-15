@@ -1,7 +1,14 @@
 import os
 import calendar
 import hmac
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
+# 日本標準時 (UTC+9)。Vercel は UTC で動くため、日付計算は JST に合わせる。
+JST = timezone(timedelta(hours=9))
+
+
+def now_jst():
+    return datetime.now(JST)
 
 import jpholiday
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
@@ -192,8 +199,8 @@ def logout():
 
 @app.route("/")
 def show_calendar():
-    year = request.args.get("year", default=datetime.now().year, type=int)
-    month = request.args.get("month", default=datetime.now().month, type=int)
+    year = request.args.get("year", default=now_jst().year, type=int)
+    month = request.args.get("month", default=now_jst().month, type=int)
 
     if month < 1:
         month = 12
@@ -204,7 +211,7 @@ def show_calendar():
 
     cal = calendar.Calendar(firstweekday=6)
     raw_weeks = cal.monthdatescalendar(year, month)
-    today = datetime.now().date()
+    today = now_jst().date()
 
     first_day = raw_weeks[0][0]
     last_day = raw_weeks[-1][-1]
