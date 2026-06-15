@@ -23,6 +23,8 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
 }
 
+APP_NAME = "千葉北テニス"
+DEFAULT_EVENT_TITLE = "千葉北"
 MAX_PARTICIPANTS = 4
 START_HOUR = 6
 END_HOUR = 22
@@ -78,26 +80,33 @@ class Member(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
 
 
-def build_time_slots():
+def build_time_options():
     return [
-        {
-            "value": f"{hour:02d}:00-{hour + 1:02d}:00",
-            "label": f"{hour:02d}:00 - {hour + 1:02d}:00",
-        }
-        for hour in range(START_HOUR, END_HOUR)
+        {"value": f"{hour:02d}:00", "label": f"{hour:02d}:00"}
+        for hour in range(START_HOUR, END_HOUR + 1)
     ]
 
 
-def parse_time_slot(slot_value):
+def parse_hour(time_value):
     try:
-        start_time, end_time = slot_value.split("-", 1)
-    except ValueError:
-        return None, None
+        parsed_time = datetime.strptime(time_value, "%H:%M").time()
+    except (TypeError, ValueError):
+        return None
 
-    valid_slots = {slot["value"] for slot in build_time_slots()}
-    if slot_value not in valid_slots:
-        return None, None
-    return start_time, end_time
+    if parsed_time.minute != 0:
+        return None
+    if parsed_time.hour < START_HOUR or parsed_time.hour > END_HOUR:
+        return None
+    return parsed_time.hour
+
+
+def validate_time_range(start_time, end_time):
+    start_hour = parse_hour(start_time)
+    end_hour = parse_hour(end_time)
+
+    if start_hour is None or end_hour is None:
+        return False
+    return start_hour < end_hour
 
 
 def ensure_event_time_columns():
@@ -123,6 +132,11 @@ with app.app_context():
         ensure_event_time_columns()
     except Exception as exc:  # noqa: BLE001
         app.logger.warning("db.create_all() をスキップしました: %s", exc)
+
+
+@app.context_processor
+def inject_app_name():
+    return {"app_name": APP_NAME}
 
 
 @app.route("/")
@@ -177,13 +191,13 @@ def show_calendar():
 @app.route("/event/add", methods=["GET", "POST"])
 def add_event():
     selected_date = request.args.get("date", "")
-    time_slots = build_time_slots()
+    time_options = build_time_options()
 
     if request.method == "POST":
         event_date_str = request.form.get("date")
-        title = request.form.get("title") or "テニスコート予約"
-        time_slot = request.form.get("time_slot", "")
-        start_time, end_time = parse_time_slot(time_slot)
+        title = request.form.get("title", "").strip() or DEFAULT_EVENT_TITLE
+        start_time = request.form.get("start_time", "")
+        end_time = request.form.get("end_time", "")
         description = request.form.get("description")
 
         try:
@@ -191,8 +205,8 @@ def add_event():
         except (TypeError, ValueError):
             return "日付の形式が正しくありません。YYYY-MM-DD の形式で入力してください。", 400
 
-        if not start_time or not end_time:
-            return "時間帯を選択してください。", 400
+        if not validate_time_range(start_time, end_time):
+            return "開始時刻より後の終了時刻を選択してください。", 400
 
         existing_event = Event.query.filter_by(date=event_date).first()
         if existing_event:
@@ -209,7 +223,12 @@ def add_event():
         db.session.commit()
         return redirect(url_for("event_detail", event_id=new_event.id))
 
-    return render_template("add_event.html", date=selected_date, time_slots=time_slots)
+    return render_template(
+        "add_event.html",
+        date=selected_date,
+        time_options=time_options,
+        default_event_title=DEFAULT_EVENT_TITLE,
+    )
 
 
 @app.route("/event/<int:event_id>", methods=["GET", "POST"])

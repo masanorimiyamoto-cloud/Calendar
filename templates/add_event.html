@@ -9,7 +9,7 @@
 <body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container">
-      <a class="navbar-brand" href="{{ url_for('show_calendar') }}">テニスコート予約</a>
+      <a class="navbar-brand" href="{{ url_for('show_calendar') }}">{{ app_name }}</a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
               aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="ナビゲーションを開く">
         <span class="navbar-toggler-icon"></span>
@@ -32,18 +32,29 @@
             <label for="date" class="form-label">予約日</label>
             <input type="date" id="date" name="date" class="form-control" value="{{ date }}" required>
           </div>
-          <div class="mb-3">
-            <label for="time_slot" class="form-label">時間</label>
-            <select id="time_slot" name="time_slot" class="form-select" required>
-              <option value="">時間を選択</option>
-              {% for slot in time_slots %}
-              <option value="{{ slot.value }}">{{ slot.label }}</option>
-              {% endfor %}
-            </select>
+          <div class="row g-2 mb-3">
+            <div class="col-12 col-sm-6">
+              <label for="start_time" class="form-label">開始時刻</label>
+              <select id="start_time" name="start_time" class="form-select" required>
+                <option value="">開始</option>
+                {% for option in time_options %}
+                <option value="{{ option.value }}">{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label for="end_time" class="form-label">終了時刻</label>
+              <select id="end_time" name="end_time" class="form-select" required>
+                <option value="">終了</option>
+                {% for option in time_options %}
+                <option value="{{ option.value }}">{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
           <div class="mb-3">
             <label for="title" class="form-label">タイトル</label>
-            <input type="text" id="title" name="title" class="form-control" placeholder="テニスコート予約">
+            <input type="text" id="title" name="title" class="form-control" placeholder="{{ default_event_title }}">
           </div>
           <div class="mb-3">
             <label for="description" class="form-label">説明</label>
