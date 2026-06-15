@@ -29,7 +29,7 @@ if "DATABASE_URL" in os.environ:
         "pool_recycle": 300,
     })
 
-APP_NAME = "千葉北テニス"
+APP_NAME = "千葉北テニスメンバー予約"
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "chibakita")
 DEFAULT_EVENT_TITLE = "千葉北"
 MAX_PARTICIPANTS = 4
