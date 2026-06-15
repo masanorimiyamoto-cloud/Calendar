@@ -126,12 +126,19 @@ def ensure_event_time_columns():
         db.session.commit()
 
 
-with app.app_context():
-    try:
-        db.create_all()
-        ensure_event_time_columns()
-    except Exception as exc:  # noqa: BLE001
-        app.logger.warning("db.create_all() をスキップしました: %s", exc)
+def should_initialize_database():
+    if os.environ.get("INIT_DB") == "1":
+        return True
+    return "DATABASE_URL" not in os.environ
+
+
+if should_initialize_database():
+    with app.app_context():
+        try:
+            db.create_all()
+            ensure_event_time_columns()
+        except Exception as exc:  # noqa: BLE001
+            app.logger.warning("db.create_all() をスキップしました: %s", exc)
 
 
 @app.context_processor
