@@ -2,52 +2,59 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ year }}年{{ month }}月のテニスコート予約</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    .holiday { color: #dc3545; font-weight: bold; }
-    .calendar-table td { height: 140px; vertical-align: top; border: 1px solid #dee2e6; padding: 8px; }
-    .calendar-table th { background-color: #f8f9fa; }
+    .calendar-table td {
+      min-width: 120px;
+      height: 140px;
+      vertical-align: top;
+      border: 1px solid #dee2e6;
+      padding: 8px;
+    }
+    .calendar-table th { background-color: #f8f9fa; text-align: center; }
+    .calendar-cell { transition: transform 0.1s ease, background-color 0.1s ease; }
+    .calendar-cell:hover { background-color: #f8f9fa; }
+    .calendar-cell.pressed { transform: scale(0.98); background-color: #e9ecef; }
     .today { background-color: #fff3cd; }
-    .prev-month, .next-month { color: #6c757d; }
-    .event-card { margin: 2px 0; }
+    .holiday, .sunday { color: #dc3545; }
+    .saturday { color: #0d6efd; }
+    .prev-month, .next-month { color: #6c757d; background-color: #fafafa; }
     .status-available { color: #198754; }
     .status-full { color: #dc3545; }
-    .calendar-cell { transition: transform 0.1s ease, background-color 0.1s ease; cursor: pointer; }
-    .calendar-cell:hover { background-color: #f8f9fa; }
-    .calendar-cell.pressed { transform: scale(0.97); background-color: #e9ecef; }
   </style>
 </head>
 <body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container">
-      <a class="navbar-brand" href="/">テニスコート予約</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" 
-              aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-         <span class="navbar-toggler-icon"></span>
+      <a class="navbar-brand" href="{{ url_for('show_calendar') }}">テニスコート予約</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+              aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="ナビゲーションを開く">
+        <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" href="/event/add">予約を追加</a></li>
-          <li class="nav-item"><a class="nav-link" href="/members">メンバー管理</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('add_event') }}">予約を追加</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('members') }}">メンバー管理</a></li>
         </ul>
       </div>
     </div>
   </nav>
 
-  <div class="container mt-4">
+  <main class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <a href="/?year={{ year }}&month={{ month - 1 }}" class="btn btn-outline-secondary">前月</a>
-      <h2>{{ year }}年{{ month }}月</h2>
-      <a href="/?year={{ year }}&month={{ month + 1 }}" class="btn btn-outline-secondary">次月</a>
+      <a href="{{ url_for('show_calendar', year=year, month=month - 1) }}" class="btn btn-outline-secondary">前月</a>
+      <h1 class="h3 mb-0">{{ year }}年{{ month }}月</h1>
+      <a href="{{ url_for('show_calendar', year=year, month=month + 1) }}" class="btn btn-outline-secondary">次月</a>
     </div>
 
     <div class="text-center mb-4">
-      <a href="/" class="btn btn-info me-2">今日</a>
-      <a href="/event/add" class="btn btn-primary">予約を追加</a>
+      <a href="{{ url_for('show_calendar') }}" class="btn btn-info me-2">今月</a>
+      <a href="{{ url_for('add_event') }}" class="btn btn-primary">予約を追加</a>
     </div>
 
-    <form method="get" action="/" class="d-flex justify-content-center mb-4">
+    <form method="get" action="{{ url_for('show_calendar') }}" class="d-flex justify-content-center mb-4">
       <select name="year" class="form-select w-auto me-2" onchange="this.form.submit()">
         {% for y in range(year - 5, year + 6) %}
         <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}年</option>
@@ -77,7 +84,7 @@
           {% for week in month_days %}
           <tr>
             {% for day in week %}
-            {% set d = day['date'] %}
+            {% set d = day.date %}
             {% set event = day.events[0] if day.events else None %}
             <td class="calendar-cell position-relative
               {% if not day.in_month %}prev-month{% endif %}
@@ -86,27 +93,26 @@
               {% if d.weekday() == 6 %} sunday{% elif d.weekday() == 5 %} saturday{% endif %}">
               <div class="fw-bold">{{ d.day }}</div>
               {% if day.is_holiday %}
-                <div class="small">{{ day.holiday_name }}</div>
+              <div class="small">{{ day.holiday_name }}</div>
               {% endif %}
+
               {% if event %}
-                <div class="small mt-2">
-                  <a href="/event/{{ event.id }}" class="text-decoration-none">
-                    <span class="fw-bold">{{ event.title }}</span>
-                  </a>
-                </div>
-                <div class="small">
-                  参加: {{ event.attending_count }} / 4
-                </div>
-                {% if event.attending_count >= 4 %}
-                <div class="small status-full">満席</div>
-                {% else %}
-                <div class="small status-available">参加受付中</div>
-                {% endif %}
+              <div class="small mt-2">
+                <a href="{{ url_for('event_detail', event_id=event.id) }}" class="text-decoration-none">
+                  <span class="fw-bold">{{ event.title }}</span>
+                </a>
+              </div>
+              <div class="small">参加: {{ event.attending_count }} / 4</div>
+              {% if event.attending_count >= 4 %}
+              <div class="small status-full">満席</div>
               {% else %}
-                <div class="small mt-2">
-                  <a href="/event/add?date={{ d.strftime('%Y-%m-%d') }}" class="text-decoration-none">予約を登録</a>
-                </div>
-                <div class="small text-muted">空きあり</div>
+              <div class="small status-available">参加受付中</div>
+              {% endif %}
+              {% else %}
+              <div class="small mt-2">
+                <a href="{{ url_for('add_event', date=d.strftime('%Y-%m-%d')) }}" class="text-decoration-none">予約を登録</a>
+              </div>
+              <div class="small text-muted">空きあり</div>
               {% endif %}
             </td>
             {% endfor %}
@@ -115,7 +121,7 @@
         </tbody>
       </table>
     </div>
-  </div>
+  </main>
 
   <footer class="text-center py-3 bg-light mt-4">
     <div class="container">
@@ -126,8 +132,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
-      const cells = document.querySelectorAll(".calendar-cell");
-      cells.forEach(cell => {
+      document.querySelectorAll(".calendar-cell").forEach(function(cell) {
         cell.addEventListener("mousedown", function() {
           cell.classList.add("pressed");
         });

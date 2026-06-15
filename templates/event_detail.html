@@ -7,27 +7,31 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-  <!-- ナビゲーションバー -->
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container">
-      <a class="navbar-brand" href="/">カレンダー</a>
-      <div class="collapse navbar-collapse">
+      <a class="navbar-brand" href="{{ url_for('show_calendar') }}">テニスコート予約</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+              aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="ナビゲーションを開く">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav ms-auto">
-          <li class="nav-item"><a class="nav-link" href="/">ホーム</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('show_calendar') }}">カレンダー</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('members') }}">メンバー管理</a></li>
         </ul>
       </div>
     </div>
   </nav>
-  <div class="container mt-4">
+
+  <main class="container mt-4">
     <div class="card">
-      <div class="card-header">
-        予約詳細
-      </div>
+      <div class="card-header">予約詳細</div>
       <div class="card-body">
-        <h3 class="card-title">{{ event.title }}</h3>
+        <h1 class="h3 card-title">{{ event.title }}</h1>
         <p class="card-text">日付: {{ event.date.strftime('%Y-%m-%d') }}</p>
-        {% if event.description %}<p class="card-text">{{ event.description }}</p>{% endif %}
+        {% if event.description %}
+        <p class="card-text">{{ event.description }}</p>
+        {% endif %}
         <p class="card-text">
           参加: <span class="fw-bold">{{ event.attending_count }}</span> / {{ max_participants }} 名
         </p>
@@ -36,28 +40,32 @@
         <div class="alert alert-danger">{{ error_message }}</div>
         {% endif %}
 
-        <h5 class="mt-4">出欠表</h5>
+        <h2 class="h5 mt-4">出欠表</h2>
         {% if not has_members %}
-          <div class="alert alert-warning">
-            メンバーがまだ登録されていません。
-            <a href="{{ url_for('members') }}">メンバー管理</a> から追加してください。
-          </div>
+        <div class="alert alert-warning">
+          メンバーがまだ登録されていません。
+          <a href="{{ url_for('members') }}">メンバー管理</a> から追加してください。
+        </div>
         {% else %}
         <ul class="list-group mb-3">
           {% for row in member_rows %}
-          <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap">
+          <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span class="fw-bold me-3">
               {{ row.name }}
-              {% if row.status == 'attend' %}<span class="badge bg-success">参加</span>
-              {% elif row.status == 'absent' %}<span class="badge bg-secondary">不参加</span>
-              {% else %}<span class="badge bg-light text-dark border">未定</span>{% endif %}
+              {% if row.status == 'attend' %}
+              <span class="badge bg-success">参加</span>
+              {% elif row.status == 'absent' %}
+              <span class="badge bg-secondary">不参加</span>
+              {% else %}
+              <span class="badge bg-light text-dark border">未定</span>
+              {% endif %}
             </span>
-            <div class="btn-group" role="group">
+            <div class="btn-group" role="group" aria-label="{{ row.name }} の出欠">
               <form method="post" class="d-inline">
                 <input type="hidden" name="member_name" value="{{ row.name }}">
                 <input type="hidden" name="status" value="attend">
                 <button type="submit"
-                  class="btn btn-sm {% if row.status == 'attend' %}btn-success{% else %}btn-outline-success{% endif %}">
+                        class="btn btn-sm {% if row.status == 'attend' %}btn-success{% else %}btn-outline-success{% endif %}">
                   参加
                 </button>
               </form>
@@ -65,7 +73,7 @@
                 <input type="hidden" name="member_name" value="{{ row.name }}">
                 <input type="hidden" name="status" value="absent">
                 <button type="submit"
-                  class="btn btn-sm {% if row.status == 'absent' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                        class="btn btn-sm {% if row.status == 'absent' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
                   不参加
                 </button>
               </form>
@@ -73,7 +81,7 @@
                 <input type="hidden" name="member_name" value="{{ row.name }}">
                 <input type="hidden" name="status" value="undecided">
                 <button type="submit"
-                  class="btn btn-sm {% if row.status == 'undecided' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+                        class="btn btn-sm {% if row.status == 'undecided' %}btn-dark{% else %}btn-outline-dark{% endif %}">
                   未定
                 </button>
               </form>
@@ -83,10 +91,11 @@
         </ul>
         {% endif %}
 
-        <a href="/" class="btn btn-secondary">カレンダーに戻る</a>
+        <a href="{{ url_for('show_calendar') }}" class="btn btn-secondary">カレンダーに戻る</a>
       </div>
     </div>
-  </div>
+  </main>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
