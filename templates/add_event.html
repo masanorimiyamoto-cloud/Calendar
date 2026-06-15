@@ -33,12 +33,21 @@
             <input type="date" id="date" name="date" class="form-control" value="{{ date }}" required>
           </div>
           <div class="mb-3">
+            <label for="time_slot" class="form-label">時間</label>
+            <select id="time_slot" name="time_slot" class="form-select" required>
+              <option value="">時間を選択</option>
+              {% for slot in time_slots %}
+              <option value="{{ slot.value }}">{{ slot.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
             <label for="title" class="form-label">タイトル</label>
             <input type="text" id="title" name="title" class="form-control" placeholder="テニスコート予約">
           </div>
           <div class="mb-3">
             <label for="description" class="form-label">説明</label>
-            <textarea id="description" name="description" class="form-control" placeholder="時間、場所、備考など"></textarea>
+            <textarea id="description" name="description" class="form-control" placeholder="場所、コート番号、備考など"></textarea>
           </div>
           <button type="submit" class="btn btn-primary">追加</button>
           <a href="{{ url_for('show_calendar') }}" class="btn btn-secondary ms-2">カレンダーに戻る</a>

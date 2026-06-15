@@ -15,15 +15,38 @@
     }
     .calendar-table th { background-color: #f8f9fa; text-align: center; }
     .calendar-cell { transition: transform 0.1s ease, background-color 0.1s ease; }
-    .calendar-cell.has-event { cursor: pointer; }
+    .calendar-cell.has-event { cursor: pointer; background-color: #f6fbff; }
     .calendar-cell:hover { background-color: #f8f9fa; }
     .calendar-cell.pressed { transform: scale(0.98); background-color: #e9ecef; }
     .today { background-color: #fff3cd; }
     .holiday, .sunday { color: #dc3545; }
     .saturday { color: #0d6efd; }
     .prev-month, .next-month { color: #6c757d; background-color: #fafafa; }
+    .event-title { color: #0d6efd; }
+    .event-time { color: #495057; }
     .status-available { color: #198754; }
     .status-full { color: #dc3545; }
+    .add-day-link {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border: 1px solid #dee2e6;
+      border-radius: 50%;
+      color: #6c757d;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      text-decoration: none;
+      background-color: #fff;
+    }
+    .add-day-link:hover {
+      color: #0d6efd;
+      border-color: #0d6efd;
+      background-color: #eef6ff;
+    }
   </style>
 </head>
 <body>
@@ -101,9 +124,12 @@
               {% if event %}
               <div class="small mt-2">
                 <a href="{{ url_for('event_detail', event_id=event.id) }}" class="text-decoration-none stretched-link">
-                  <span class="fw-bold">{{ event.title }}</span>
+                  <span class="fw-bold event-title">{{ event.title }}</span>
                 </a>
               </div>
+              {% if event.time_range %}
+              <div class="small event-time">{{ event.time_range }}</div>
+              {% endif %}
               <div class="small">参加: {{ event.attending_count }} / 4</div>
               {% if event.attending_count >= 4 %}
               <div class="small status-full">満席</div>
@@ -111,10 +137,10 @@
               <div class="small status-available">参加受付中</div>
               {% endif %}
               {% else %}
-              <div class="small mt-2">
-                <a href="{{ url_for('add_event', date=d.strftime('%Y-%m-%d')) }}" class="text-decoration-none">予約を登録</a>
-              </div>
-              <div class="small text-muted">空きあり</div>
+              <a href="{{ url_for('add_event', date=d.strftime('%Y-%m-%d')) }}"
+                 class="add-day-link"
+                 aria-label="{{ d.strftime('%Y-%m-%d') }} の予約を追加"
+                 title="予約を追加">+</a>
               {% endif %}
             </td>
             {% endfor %}

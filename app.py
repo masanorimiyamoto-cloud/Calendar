@@ -5,6 +5,7 @@ from datetime import datetime
 import jpholiday
 from flask import Flask, redirect, render_template, request, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 from sqlalchemy.pool import NullPool
 
 
@@ -23,6 +24,8 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 
 MAX_PARTICIPANTS = 4
+START_HOUR = 6
+END_HOUR = 22
 
 db = SQLAlchemy(app)
 
@@ -31,6 +34,8 @@ class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False, unique=True)
     title = db.Column(db.String(100), nullable=False)
+    start_time = db.Column(db.String(5))
+    end_time = db.Column(db.String(5))
     description = db.Column(db.Text)
     participants = db.relationship(
         "Participant",
@@ -46,6 +51,12 @@ class Event(db.Model):
     @property
     def participant_count(self):
         return len(self.participants)
+
+    @property
+    def time_range(self):
+        if self.start_time and self.end_time:
+            return f"{self.start_time} - {self.end_time}"
+        return ""
 
 
 class Participant(db.Model):
@@ -67,9 +78,49 @@ class Member(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
 
 
+def build_time_slots():
+    return [
+        {
+            "value": f"{hour:02d}:00-{hour + 1:02d}:00",
+            "label": f"{hour:02d}:00 - {hour + 1:02d}:00",
+        }
+        for hour in range(START_HOUR, END_HOUR)
+    ]
+
+
+def parse_time_slot(slot_value):
+    try:
+        start_time, end_time = slot_value.split("-", 1)
+    except ValueError:
+        return None, None
+
+    valid_slots = {slot["value"] for slot in build_time_slots()}
+    if slot_value not in valid_slots:
+        return None, None
+    return start_time, end_time
+
+
+def ensure_event_time_columns():
+    inspector = inspect(db.engine)
+    existing_columns = {column["name"] for column in inspector.get_columns("event")}
+    statements = []
+
+    if "start_time" not in existing_columns:
+        statements.append("ALTER TABLE event ADD COLUMN start_time VARCHAR(5)")
+    if "end_time" not in existing_columns:
+        statements.append("ALTER TABLE event ADD COLUMN end_time VARCHAR(5)")
+
+    for statement in statements:
+        db.session.execute(text(statement))
+
+    if statements:
+        db.session.commit()
+
+
 with app.app_context():
     try:
         db.create_all()
+        ensure_event_time_columns()
     except Exception as exc:  # noqa: BLE001
         app.logger.warning("db.create_all() をスキップしました: %s", exc)
 
@@ -126,10 +177,13 @@ def show_calendar():
 @app.route("/event/add", methods=["GET", "POST"])
 def add_event():
     selected_date = request.args.get("date", "")
+    time_slots = build_time_slots()
 
     if request.method == "POST":
         event_date_str = request.form.get("date")
         title = request.form.get("title") or "テニスコート予約"
+        time_slot = request.form.get("time_slot", "")
+        start_time, end_time = parse_time_slot(time_slot)
         description = request.form.get("description")
 
         try:
@@ -137,16 +191,25 @@ def add_event():
         except (TypeError, ValueError):
             return "日付の形式が正しくありません。YYYY-MM-DD の形式で入力してください。", 400
 
+        if not start_time or not end_time:
+            return "時間帯を選択してください。", 400
+
         existing_event = Event.query.filter_by(date=event_date).first()
         if existing_event:
             return redirect(url_for("event_detail", event_id=existing_event.id))
 
-        new_event = Event(date=event_date, title=title, description=description)
+        new_event = Event(
+            date=event_date,
+            title=title,
+            start_time=start_time,
+            end_time=end_time,
+            description=description,
+        )
         db.session.add(new_event)
         db.session.commit()
         return redirect(url_for("event_detail", event_id=new_event.id))
 
-    return render_template("add_event.html", date=selected_date)
+    return render_template("add_event.html", date=selected_date, time_slots=time_slots)
 
 
 @app.route("/event/<int:event_id>", methods=["GET", "POST"])
