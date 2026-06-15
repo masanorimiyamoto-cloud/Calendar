@@ -1,14 +1,16 @@
 import os
 import calendar
+import hmac
 from datetime import datetime
 
 import jpholiday
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
 # Production uses DATABASE_URL, typically PostgreSQL on Vercel/Neon.
 # Local development falls back to instance/events.db.
@@ -28,6 +30,7 @@ if "DATABASE_URL" in os.environ:
     })
 
 APP_NAME = "千葉北テニス"
+ACCESS_CODE = os.environ.get("ACCESS_CODE", "chibakita")
 DEFAULT_EVENT_TITLE = "千葉北"
 MAX_PARTICIPANTS = 4
 START_HOUR = 6
@@ -148,6 +151,40 @@ if should_initialize_database():
 @app.context_processor
 def inject_app_name():
     return {"app_name": APP_NAME}
+
+
+@app.before_request
+def require_login():
+    if request.endpoint in {"login", "static"} or request.endpoint is None:
+        return None
+    if session.get("authenticated"):
+        return None
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify({"ok": False, "error": "ログインしてください。"}), 401
+    return redirect(url_for("login", next=request.full_path))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error_message = None
+    next_url = request.args.get("next") or url_for("show_calendar")
+    if not next_url.startswith("/"):
+        next_url = url_for("show_calendar")
+
+    if request.method == "POST":
+        code = request.form.get("access_code", "")
+        if hmac.compare_digest(code, ACCESS_CODE):
+            session["authenticated"] = True
+            return redirect(next_url)
+        error_message = "合言葉が違います。"
+
+    return render_template("login.html", error_message=error_message, next_url=next_url)
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.route("/")
