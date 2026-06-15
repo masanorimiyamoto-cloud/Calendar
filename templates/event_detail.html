@@ -108,7 +108,7 @@
         </ul>
         {% endif %}
 
-        <a href="{{ url_for('show_calendar') }}" class="btn btn-secondary">カレンダーに戻る</a>
+        <a href="{{ url_for('show_calendar', year=event.date.year, month=event.date.month) }}" class="btn btn-secondary">カレンダーに戻る</a>
       </div>
     </div>
   </main>
