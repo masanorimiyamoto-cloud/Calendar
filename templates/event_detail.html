@@ -25,7 +25,15 @@
 
   <main class="container mt-4">
     <div class="card">
-      <div class="card-header">予約詳細</div>
+      <div class="card-header d-flex justify-content-between align-items-center gap-2">
+        <span>予約詳細</span>
+        <form method="post"
+              action="{{ url_for('delete_event', event_id=event.id) }}"
+              onsubmit="return confirm('この予約を削除しますか？参加状況も削除されます。');"
+              class="m-0">
+          <button type="submit" class="btn btn-sm btn-outline-danger">予約を削除</button>
+        </form>
+      </div>
       <div class="card-body">
         <h1 class="h3 card-title">{{ event.title }}</h1>
         <p class="card-text">日付: {{ event.date.strftime('%Y-%m-%d') }}</p>

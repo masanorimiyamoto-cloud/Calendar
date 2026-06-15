@@ -287,6 +287,14 @@ def event_detail(event_id):
     )
 
 
+@app.route("/event/<int:event_id>/delete", methods=["POST"])
+def delete_event(event_id):
+    event = Event.query.get_or_404(event_id)
+    db.session.delete(event)
+    db.session.commit()
+    return redirect(url_for("show_calendar", year=event.date.year, month=event.date.month))
+
+
 @app.route("/members", methods=["GET"])
 def members():
     member_list = Member.query.order_by(Member.id).all()
