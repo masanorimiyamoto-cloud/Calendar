@@ -405,9 +405,12 @@ def update_attendance(event_id):
 @app.route("/event/<int:event_id>/delete", methods=["POST"])
 def delete_event(event_id):
     event = Event.query.get_or_404(event_id)
+    # 削除後はインスタンスにアクセスできないため、リダイレクト先の年月を先に控える。
+    year = event.date.year
+    month = event.date.month
     db.session.delete(event)
     db.session.commit()
-    return redirect(url_for("show_calendar", year=event.date.year, month=event.date.month))
+    return redirect(url_for("show_calendar", year=year, month=month))
 
 
 @app.route("/members", methods=["GET"])
