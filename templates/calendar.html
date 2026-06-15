@@ -204,43 +204,56 @@
       const currentEventIds = Array.from(document.querySelectorAll("[data-event-id]"))
         .map(function(element) { return element.dataset.eventId; })
         .filter(Boolean);
-      const storedKnownEvents = localStorage.getItem(knownEventsKey);
-      const knownEvents = new Set(storedKnownEvents ? JSON.parse(storedKnownEvents) : currentEventIds);
 
-      document.querySelectorAll(".calendar-cell.has-event[data-event-id]").forEach(function(cell) {
-        const eventId = cell.dataset.eventId;
-        if (storedKnownEvents && !knownEvents.has(eventId)) {
-          cell.classList.add("new-event");
-          const badge = cell.querySelector(".new-event-badge");
-          if (badge) {
-            badge.style.display = "inline-block";
-          }
-        }
-      });
-
-      if (!storedKnownEvents) {
+      // 初回訪問時は、今あるイベントを既知としてベースライン化（既存分に新規を付けない）。
+      if (localStorage.getItem(knownEventsKey) === null) {
         localStorage.setItem(knownEventsKey, JSON.stringify(currentEventIds));
       }
 
+      // localStorage の既読状態をもとに「新規」「変更」バッジを再描画する。
+      // DOMContentLoaded だけでなく pageshow でも呼ぶことで、戻るボタン(bfcache)で
+      // 復元された時にも、詳細を見て既読になったイベントのバッジを消す。
+      function refreshBadges() {
+        const knownEvents = new Set(JSON.parse(localStorage.getItem(knownEventsKey) || "[]"));
+
+        document.querySelectorAll(".calendar-cell.has-event[data-event-id]").forEach(function(cell) {
+          const eventId = cell.dataset.eventId;
+          const badge = cell.querySelector(".new-event-badge");
+          const isNew = !knownEvents.has(eventId);
+          cell.classList.toggle("new-event", isNew);
+          if (badge) {
+            badge.style.display = isNew ? "inline-block" : "none";
+          }
+        });
+
+        document.querySelectorAll(".change-badge").forEach(function(badge) {
+          const eventId = badge.dataset.eventId;
+          const currentVersion = Number(badge.dataset.changeVersion || "0");
+          const seenVersion = Number(localStorage.getItem("eventSeenVersion:" + eventId) || "0");
+          const unseenCount = Math.max(currentVersion - seenVersion, 0);
+
+          if (unseenCount > 0) {
+            badge.textContent = "変更 " + unseenCount;
+            badge.style.display = "inline-block";
+          } else {
+            badge.textContent = "";
+            badge.style.display = "none";
+          }
+        });
+      }
+
+      refreshBadges();
+      // 戻るボタンで復元された時も再評価する。
+      window.addEventListener("pageshow", refreshBadges);
+
+      // 詳細を開いた時点で「既読」にする（中身を操作しなくても新規が消える）。
       document.querySelectorAll(".event-detail-link").forEach(function(link) {
         link.addEventListener("click", function() {
           const eventId = link.dataset.eventId;
-          const latestKnownEvents = new Set(JSON.parse(localStorage.getItem(knownEventsKey) || "[]"));
-          latestKnownEvents.add(eventId);
-          localStorage.setItem(knownEventsKey, JSON.stringify(Array.from(latestKnownEvents)));
+          const knownEvents = new Set(JSON.parse(localStorage.getItem(knownEventsKey) || "[]"));
+          knownEvents.add(eventId);
+          localStorage.setItem(knownEventsKey, JSON.stringify(Array.from(knownEvents)));
         });
-      });
-
-      document.querySelectorAll(".change-badge").forEach(function(badge) {
-        const eventId = badge.dataset.eventId;
-        const currentVersion = Number(badge.dataset.changeVersion || "0");
-        const seenVersion = Number(localStorage.getItem("eventSeenVersion:" + eventId) || "0");
-        const unseenCount = Math.max(currentVersion - seenVersion, 0);
-
-        if (unseenCount > 0) {
-          badge.textContent = "変更 " + unseenCount;
-          badge.style.display = "inline-block";
-        }
       });
 
       document.querySelectorAll(".calendar-cell").forEach(function(cell) {
