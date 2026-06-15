@@ -45,6 +45,7 @@ class Event(db.Model):
     title = db.Column(db.String(100), nullable=False)
     start_time = db.Column(db.String(5))
     end_time = db.Column(db.String(5))
+    change_version = db.Column(db.Integer, nullable=False, default=0)
     description = db.Column(db.Text)
     participants = db.relationship(
         "Participant",
@@ -125,6 +126,8 @@ def ensure_event_time_columns():
         statements.append("ALTER TABLE event ADD COLUMN start_time VARCHAR(5)")
     if "end_time" not in existing_columns:
         statements.append("ALTER TABLE event ADD COLUMN end_time VARCHAR(5)")
+    if "change_version" not in existing_columns:
+        statements.append("ALTER TABLE event ADD COLUMN change_version INTEGER DEFAULT 0 NOT NULL")
 
     for statement in statements:
         db.session.execute(text(statement))
@@ -343,8 +346,8 @@ def update_attendance(event_id):
     if status not in ("attend", "absent", "undecided"):
         return jsonify({"ok": False, "error": "不正な操作です。"}), 400
 
-    event_exists = Event.query.with_entities(Event.id).filter_by(id=event_id).first()
-    if not event_exists:
+    event = Event.query.filter_by(id=event_id).first()
+    if not event:
         return jsonify({"ok": False, "error": "予約が見つかりません。"}), 404
 
     member_exists = Member.query.with_entities(Member.id).filter_by(name=name).first()
@@ -352,6 +355,9 @@ def update_attendance(event_id):
         return jsonify({"ok": False, "error": "メンバーが見つかりません。"}), 400
 
     participant = Participant.query.filter_by(event_id=event_id, name=name).first()
+    previous_status = "undecided"
+    if participant:
+        previous_status = "attend" if participant.attending else "absent"
 
     if status == "undecided":
         if participant:
@@ -373,6 +379,9 @@ def update_attendance(event_id):
         else:
             db.session.add(Participant(event_id=event_id, name=name, attending=attending))
 
+    if status != previous_status:
+        event.change_version = (event.change_version or 0) + 1
+
     db.session.commit()
 
     attending_count = Participant.query.filter_by(event_id=event_id, attending=True).count()
@@ -382,6 +391,7 @@ def update_attendance(event_id):
         "status": status,
         "attending_count": attending_count,
         "max_participants": MAX_PARTICIPANTS,
+        "change_version": event.change_version or 0,
     })
 
 

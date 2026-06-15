@@ -26,6 +26,13 @@
     .event-time { color: #495057; }
     .status-available { color: #198754; }
     .status-full { color: #dc3545; }
+    .change-badge {
+      position: relative;
+      z-index: 2;
+      display: none;
+      margin-top: 4px;
+      font-size: 0.75rem;
+    }
     .add-day-link {
       position: absolute;
       top: 6px;
@@ -136,6 +143,9 @@
               <div class="small event-time">{{ event.time_range }}</div>
               {% endif %}
               <div class="small">参加: {{ event.attending_count }} / 4</div>
+              <span class="badge rounded-pill bg-warning text-dark change-badge"
+                    data-event-id="{{ event.id }}"
+                    data-change-version="{{ event.change_version or 0 }}"></span>
               {% if event.attending_count >= 4 %}
               <div class="small status-full">満席</div>
               {% else %}
@@ -165,6 +175,18 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
+      document.querySelectorAll(".change-badge").forEach(function(badge) {
+        const eventId = badge.dataset.eventId;
+        const currentVersion = Number(badge.dataset.changeVersion || "0");
+        const seenVersion = Number(localStorage.getItem("eventSeenVersion:" + eventId) || "0");
+        const unseenCount = Math.max(currentVersion - seenVersion, 0);
+
+        if (unseenCount > 0) {
+          badge.textContent = "変更 " + unseenCount;
+          badge.style.display = "inline-block";
+        }
+      });
+
       document.querySelectorAll(".calendar-cell").forEach(function(cell) {
         cell.addEventListener("mousedown", function() {
           cell.classList.add("pressed");
