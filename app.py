@@ -3,10 +3,9 @@ import calendar
 from datetime import datetime
 
 import jpholiday
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
-from sqlalchemy.pool import NullPool
 
 
 app = Flask(__name__)
@@ -19,9 +18,14 @@ database_url = database_url.replace("postgres://", "postgresql://")
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "poolclass": NullPool,
     "pool_pre_ping": True,
 }
+if "DATABASE_URL" in os.environ:
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"].update({
+        "pool_size": 1,
+        "max_overflow": 2,
+        "pool_recycle": 300,
+    })
 
 APP_NAME = "千葉北テニス"
 DEFAULT_EVENT_TITLE = "千葉北"
@@ -292,6 +296,56 @@ def event_detail(event_id):
         has_members=bool(members),
         error_message=error_message,
     )
+
+
+@app.route("/event/<int:event_id>/attendance", methods=["POST"])
+def update_attendance(event_id):
+    name = request.form.get("member_name", "").strip()
+    status = request.form.get("status", "")
+
+    if status not in ("attend", "absent", "undecided"):
+        return jsonify({"ok": False, "error": "不正な操作です。"}), 400
+
+    event_exists = Event.query.with_entities(Event.id).filter_by(id=event_id).first()
+    if not event_exists:
+        return jsonify({"ok": False, "error": "予約が見つかりません。"}), 404
+
+    member_exists = Member.query.with_entities(Member.id).filter_by(name=name).first()
+    if not member_exists:
+        return jsonify({"ok": False, "error": "メンバーが見つかりません。"}), 400
+
+    participant = Participant.query.filter_by(event_id=event_id, name=name).first()
+
+    if status == "undecided":
+        if participant:
+            db.session.delete(participant)
+    else:
+        attending = status == "attend"
+        already_attending = participant.attending if participant else False
+
+        if attending and not already_attending:
+            attending_count = Participant.query.filter_by(event_id=event_id, attending=True).count()
+            if attending_count >= MAX_PARTICIPANTS:
+                return jsonify({
+                    "ok": False,
+                    "error": f"参加は最大 {MAX_PARTICIPANTS} 名までです。",
+                }), 400
+
+        if participant:
+            participant.attending = attending
+        else:
+            db.session.add(Participant(event_id=event_id, name=name, attending=attending))
+
+    db.session.commit()
+
+    attending_count = Participant.query.filter_by(event_id=event_id, attending=True).count()
+    return jsonify({
+        "ok": True,
+        "name": name,
+        "status": status,
+        "attending_count": attending_count,
+        "max_participants": MAX_PARTICIPANTS,
+    })
 
 
 @app.route("/event/<int:event_id>/delete", methods=["POST"])

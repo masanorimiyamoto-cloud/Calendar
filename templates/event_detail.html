@@ -44,9 +44,10 @@
         <p class="card-text">{{ event.description }}</p>
         {% endif %}
         <p class="card-text">
-          参加: <span class="fw-bold">{{ event.attending_count }}</span> / {{ max_participants }} 名
+          参加: <span id="attending-count" class="fw-bold">{{ event.attending_count }}</span> / {{ max_participants }} 名
         </p>
 
+        <div id="attendance-error" class="alert alert-danger d-none"></div>
         {% if error_message %}
         <div class="alert alert-danger">{{ error_message }}</div>
         {% endif %}
@@ -60,42 +61,40 @@
         {% else %}
         <ul class="list-group mb-3">
           {% for row in member_rows %}
-          <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2"
+              data-member-row="{{ row.name }}">
             <span class="fw-bold me-3">
               {{ row.name }}
-              {% if row.status == 'attend' %}
-              <span class="badge bg-success">参加</span>
-              {% elif row.status == 'absent' %}
-              <span class="badge bg-secondary">不参加</span>
-              {% else %}
-              <span class="badge bg-light text-dark border">未定</span>
-              {% endif %}
+              <span class="badge attendance-badge
+                {% if row.status == 'attend' %}bg-success
+                {% elif row.status == 'absent' %}bg-secondary
+                {% else %}bg-light text-dark border{% endif %}">
+                {% if row.status == 'attend' %}参加
+                {% elif row.status == 'absent' %}不参加
+                {% else %}未定{% endif %}
+              </span>
             </span>
             <div class="btn-group" role="group" aria-label="{{ row.name }} の出欠">
-              <form method="post" class="d-inline">
+              {% for status_value, label, active_class, outline_class in [
+                ('attend', '参加', 'btn-success', 'btn-outline-success'),
+                ('absent', '不参加', 'btn-secondary', 'btn-outline-secondary'),
+                ('undecided', '未定', 'btn-dark', 'btn-outline-dark')
+              ] %}
+              <form method="post"
+                    action="{{ url_for('update_attendance', event_id=event.id) }}"
+                    class="d-inline attendance-form"
+                    data-member-name="{{ row.name }}"
+                    data-status="{{ status_value }}">
                 <input type="hidden" name="member_name" value="{{ row.name }}">
-                <input type="hidden" name="status" value="attend">
+                <input type="hidden" name="status" value="{{ status_value }}">
                 <button type="submit"
-                        class="btn btn-sm {% if row.status == 'attend' %}btn-success{% else %}btn-outline-success{% endif %}">
-                  参加
+                        class="btn btn-sm attendance-button {% if row.status == status_value %}{{ active_class }}{% else %}{{ outline_class }}{% endif %}"
+                        data-active-class="{{ active_class }}"
+                        data-outline-class="{{ outline_class }}">
+                  {{ label }}
                 </button>
               </form>
-              <form method="post" class="d-inline">
-                <input type="hidden" name="member_name" value="{{ row.name }}">
-                <input type="hidden" name="status" value="absent">
-                <button type="submit"
-                        class="btn btn-sm {% if row.status == 'absent' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-                  不参加
-                </button>
-              </form>
-              <form method="post" class="d-inline">
-                <input type="hidden" name="member_name" value="{{ row.name }}">
-                <input type="hidden" name="status" value="undecided">
-                <button type="submit"
-                        class="btn btn-sm {% if row.status == 'undecided' %}btn-dark{% else %}btn-outline-dark{% endif %}">
-                  未定
-                </button>
-              </form>
+              {% endfor %}
             </div>
           </li>
           {% endfor %}
@@ -108,5 +107,77 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const statusLabels = {
+      attend: "参加",
+      absent: "不参加",
+      undecided: "未定"
+    };
+    const statusBadgeClasses = {
+      attend: ["bg-success"],
+      absent: ["bg-secondary"],
+      undecided: ["bg-light", "text-dark", "border"]
+    };
+
+    function showAttendanceError(message) {
+      const errorBox = document.getElementById("attendance-error");
+      errorBox.textContent = message;
+      errorBox.classList.remove("d-none");
+    }
+
+    function clearAttendanceError() {
+      const errorBox = document.getElementById("attendance-error");
+      errorBox.textContent = "";
+      errorBox.classList.add("d-none");
+    }
+
+    function updateRow(row, status) {
+      const badge = row.querySelector(".attendance-badge");
+      badge.className = "badge attendance-badge";
+      statusBadgeClasses[status].forEach(className => badge.classList.add(className));
+      badge.textContent = statusLabels[status];
+
+      row.querySelectorAll(".attendance-form").forEach(form => {
+        const button = form.querySelector(".attendance-button");
+        button.classList.remove(button.dataset.activeClass, button.dataset.outlineClass);
+        button.classList.add(form.dataset.status === status ? button.dataset.activeClass : button.dataset.outlineClass);
+      });
+    }
+
+    document.querySelectorAll(".attendance-form").forEach(form => {
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        clearAttendanceError();
+
+        const button = form.querySelector("button");
+        const row = form.closest("[data-member-row]");
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "更新中";
+
+        try {
+          const response = await fetch(form.action, {
+            method: "POST",
+            body: new FormData(form),
+            headers: { "X-Requested-With": "fetch" }
+          });
+          const data = await response.json();
+
+          if (!response.ok || !data.ok) {
+            showAttendanceError(data.error || "更新に失敗しました。");
+            return;
+          }
+
+          document.getElementById("attending-count").textContent = data.attending_count;
+          updateRow(row, data.status);
+        } catch {
+          showAttendanceError("通信に失敗しました。時間をおいてもう一度お試しください。");
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      });
+    });
+  </script>
 </body>
 </html>
