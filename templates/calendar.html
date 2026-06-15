@@ -15,6 +15,7 @@
     }
     .calendar-table th { background-color: #f8f9fa; text-align: center; }
     .calendar-cell { transition: transform 0.1s ease, background-color 0.1s ease; }
+    .calendar-cell.has-event { cursor: pointer; }
     .calendar-cell:hover { background-color: #f8f9fa; }
     .calendar-cell.pressed { transform: scale(0.98); background-color: #e9ecef; }
     .today { background-color: #fff3cd; }
@@ -89,6 +90,7 @@
             <td class="calendar-cell position-relative
               {% if not day.in_month %}prev-month{% endif %}
               {% if day.is_today %} today{% endif %}
+              {% if event %} has-event{% endif %}
               {% if day.is_holiday %} holiday{% endif %}
               {% if d.weekday() == 6 %} sunday{% elif d.weekday() == 5 %} saturday{% endif %}">
               <div class="fw-bold">{{ d.day }}</div>
@@ -98,7 +100,7 @@
 
               {% if event %}
               <div class="small mt-2">
-                <a href="{{ url_for('event_detail', event_id=event.id) }}" class="text-decoration-none">
+                <a href="{{ url_for('event_detail', event_id=event.id) }}" class="text-decoration-none stretched-link">
                   <span class="fw-bold">{{ event.title }}</span>
                 </a>
               </div>
