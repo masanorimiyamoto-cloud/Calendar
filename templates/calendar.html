@@ -105,9 +105,21 @@
 
   <main class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <a href="{{ url_for('show_calendar', year=year, month=month - 1) }}" class="btn btn-outline-secondary">前月</a>
+      <a href="{{ url_for('show_calendar', year=year, month=month - 1) }}" class="btn btn-outline-secondary position-relative">
+        前月
+        {% if prev_reserved_days %}
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              title="前月に {{ prev_reserved_days }} 日分の予約があります">+{{ prev_reserved_days }}</span>
+        {% endif %}
+      </a>
       <h1 class="h3 mb-0">{{ year }}年{{ month }}月</h1>
-      <a href="{{ url_for('show_calendar', year=year, month=month + 1) }}" class="btn btn-outline-secondary">次月</a>
+      <a href="{{ url_for('show_calendar', year=year, month=month + 1) }}" class="btn btn-outline-secondary position-relative">
+        次月
+        {% if next_reserved_days %}
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              title="次月に {{ next_reserved_days }} 日分の予約があります">+{{ next_reserved_days }}</span>
+        {% endif %}
+      </a>
     </div>
 
     <div class="text-center mb-4">

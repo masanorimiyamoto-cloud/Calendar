@@ -1,7 +1,7 @@
 import os
 import calendar
 import hmac
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 # 日本標準時 (UTC+9)。Vercel は UTC で動くため、日付計算は JST に合わせる。
 JST = timezone(timedelta(hours=9))
@@ -274,12 +274,32 @@ def show_calendar():
             )
         month_days.append(week_data)
 
+    prev_year, prev_month = (year - 1, 12) if month == 1 else (year, month - 1)
+    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+
     return render_template(
         "calendar.html",
         year=year,
         month=month,
         month_days=month_days,
         today=today,
+        prev_reserved_days=count_reserved_days(prev_year, prev_month),
+        next_reserved_days=count_reserved_days(next_year, next_month),
+    )
+
+
+def count_reserved_days(year, month):
+    """指定した年月のうち、予約が入っている日数を返す。
+
+    隣月に予約があることを 前月/次月 ボタンの近くで知らせるために使う。
+    """
+    first = date(year, month, 1)
+    last = date(year, month, calendar.monthrange(year, month)[1])
+    return (
+        db.session.query(Event.date)
+        .filter(Event.date >= first, Event.date <= last)
+        .distinct()
+        .count()
     )
 
 
