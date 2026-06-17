@@ -18,6 +18,8 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('open_scoreboard') }}" target="_blank" rel="noopener">スコアボード</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('add_score_result') }}">スコア結果を追加</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('show_calendar') }}">カレンダー</a></li>
           <li class="nav-item"><a class="nav-link active" href="{{ url_for('members') }}">メンバー管理</a></li>
           <li class="nav-item">

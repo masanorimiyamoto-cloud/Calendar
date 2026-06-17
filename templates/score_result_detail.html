@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スコア結果</title>
+  <meta name="application-name" content="{{ app_name }}">
+  <meta name="apple-mobile-web-app-title" content="{{ app_name }}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container">
+      <a class="navbar-brand" href="{{ url_for('show_calendar') }}">{{ app_name }}</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+              aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="ナビゲーションを開く">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('show_calendar') }}">カレンダー</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('open_scoreboard') }}" target="_blank" rel="noopener">スコアボード</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('add_score_result', date=result.date.strftime('%Y-%m-%d')) }}">スコア結果を追加</a></li>
+          <li class="nav-item">
+            <form method="post" action="{{ url_for('logout') }}" class="d-inline">
+              <button type="submit" class="btn btn-link nav-link">ログアウト</button>
+            </form>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container mt-4">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center gap-2">
+        <span>スコア結果</span>
+        <form method="post"
+              action="{{ url_for('delete_score_result', result_id=result.id) }}"
+              onsubmit="return confirm('このスコア結果を削除しますか？');"
+              class="m-0">
+          <button type="submit" class="btn btn-sm btn-outline-danger">削除</button>
+        </form>
+      </div>
+      <div class="card-body">
+        <h1 class="h3 card-title">{{ result.player_a }} vs {{ result.player_b }}</h1>
+        <p class="card-text">日付: {{ result.date.strftime('%Y-%m-%d') }}</p>
+        <p class="card-text">スコア: <span class="fw-bold">{{ result.score }}</span></p>
+        {% if result.memo %}
+        <p class="card-text">{{ result.memo }}</p>
+        {% endif %}
+        <a href="{{ url_for('show_calendar', year=result.date.year, month=result.date.month) }}" class="btn btn-secondary">カレンダーに戻る</a>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

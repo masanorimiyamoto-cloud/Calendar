@@ -38,6 +38,7 @@ if "DATABASE_URL" in os.environ:
 
 APP_NAME = "千葉北テニスメンバー予約"
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "chibakita")
+SCOREBOARD_URL = os.environ.get("SCOREBOARD_URL", "").strip()
 DEFAULT_EVENT_TITLE = "千葉北"
 MAX_PARTICIPANTS = 4
 START_HOUR = 6
@@ -95,6 +96,16 @@ class Member(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
 
 
+class ScoreResult(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False, index=True)
+    player_a = db.Column(db.String(100), nullable=False)
+    player_b = db.Column(db.String(100), nullable=False)
+    score = db.Column(db.String(200), nullable=False)
+    memo = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=now_jst)
+
+
 def build_time_options():
     return [
         {"value": f"{hour:02d}:00", "label": f"{hour:02d}:00"}
@@ -149,13 +160,27 @@ def should_initialize_database():
     return "DATABASE_URL" not in os.environ
 
 
-if should_initialize_database():
-    with app.app_context():
-        try:
+def ensure_score_result_table():
+    """score_result テーブルが無ければ作成する。
+
+    本番 (DATABASE_URL あり) では db.create_all() を実行しないため、
+    後から追加したこのテーブルだけは起動時に冪等に作成しておく。
+    これを怠ると show_calendar の ScoreResult クエリが失敗し、
+    カレンダー全体が 500 になる。
+    """
+    inspector = inspect(db.engine)
+    if not inspector.has_table("score_result"):
+        ScoreResult.__table__.create(db.engine)
+
+
+with app.app_context():
+    try:
+        if should_initialize_database():
             db.create_all()
             ensure_event_time_columns()
-        except Exception as exc:  # noqa: BLE001
-            app.logger.warning("db.create_all() をスキップしました: %s", exc)
+        ensure_score_result_table()
+    except Exception as exc:  # noqa: BLE001
+        app.logger.warning("データベース初期化をスキップしました: %s", exc)
 
 
 @app.context_processor
@@ -221,6 +246,14 @@ def show_calendar():
     for event in events:
         events_by_date.setdefault(event.date, []).append(event)
 
+    score_results = ScoreResult.query.filter(
+        ScoreResult.date >= first_day,
+        ScoreResult.date <= last_day,
+    ).order_by(ScoreResult.date, ScoreResult.id).all()
+    score_results_by_date = {}
+    for result in score_results:
+        score_results_by_date.setdefault(result.date, []).append(result)
+
     month_days = []
     for week in raw_weeks:
         week_data = []
@@ -233,6 +266,7 @@ def show_calendar():
                     "is_holiday": jpholiday.is_holiday(day),
                     "holiday_name": jpholiday.is_holiday_name(day),
                     "events": events_by_date.get(day, []),
+                    "score_results": score_results_by_date.get(day, []),
                 }
             )
         month_days.append(week_data)
@@ -244,6 +278,67 @@ def show_calendar():
         month_days=month_days,
         today=today,
     )
+
+
+@app.route("/scoreboard")
+def open_scoreboard():
+    if SCOREBOARD_URL:
+        return redirect(SCOREBOARD_URL)
+    return render_template("scoreboard_unconfigured.html")
+
+
+@app.route("/scores/add", methods=["GET", "POST"])
+def add_score_result():
+    selected_date = request.args.get("date", "")
+    error_message = None
+
+    if request.method == "POST":
+        date_text = request.form.get("date", "")
+        player_a = request.form.get("player_a", "").strip()
+        player_b = request.form.get("player_b", "").strip()
+        score = request.form.get("score", "").strip()
+        memo = request.form.get("memo", "").strip()
+
+        try:
+            result_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            error_message = "日付は YYYY-MM-DD 形式で入力してください。"
+        else:
+            if not player_a or not player_b or not score:
+                error_message = "プレイヤー名とスコアを入力してください。"
+            else:
+                result = ScoreResult(
+                    date=result_date,
+                    player_a=player_a,
+                    player_b=player_b,
+                    score=score,
+                    memo=memo or None,
+                )
+                db.session.add(result)
+                db.session.commit()
+                return redirect(url_for("score_result_detail", result_id=result.id))
+
+    return render_template(
+        "add_score_result.html",
+        date=selected_date,
+        error_message=error_message,
+    )
+
+
+@app.route("/scores/<int:result_id>")
+def score_result_detail(result_id):
+    result = ScoreResult.query.get_or_404(result_id)
+    return render_template("score_result_detail.html", result=result)
+
+
+@app.route("/scores/<int:result_id>/delete", methods=["POST"])
+def delete_score_result(result_id):
+    result = ScoreResult.query.get_or_404(result_id)
+    year = result.date.year
+    month = result.date.month
+    db.session.delete(result)
+    db.session.commit()
+    return redirect(url_for("show_calendar", year=year, month=month))
 
 
 @app.route("/event/add", methods=["GET", "POST"])

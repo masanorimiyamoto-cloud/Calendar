@@ -32,6 +32,15 @@
     .prev-month, .next-month { color: #6c757d; background-color: #fafafa; }
     .event-title { color: #0d6efd; }
     .event-time { color: #495057; }
+    .score-result-link,
+    .add-score-link {
+      position: relative;
+      z-index: 3;
+    }
+    .score-result-summary {
+      color: #6f42c1;
+      line-height: 1.25;
+    }
     .status-available { color: #198754; }
     .status-full { color: #dc3545; }
     .change-badge {
@@ -82,6 +91,8 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('open_scoreboard') }}" target="_blank" rel="noopener">スコアボード</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('add_score_result') }}">スコア結果を追加</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('add_event') }}">予約を追加</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('members') }}">メンバー管理</a></li>
           <li class="nav-item">
@@ -103,6 +114,8 @@
 
     <div class="text-center mb-4">
       <a href="{{ url_for('show_calendar') }}" class="btn btn-info me-2">今月</a>
+      <a href="{{ url_for('open_scoreboard') }}" class="btn btn-success me-2" target="_blank" rel="noopener">スコアボードを開く</a>
+      <a href="{{ url_for('add_score_result') }}" class="btn btn-outline-primary me-2">スコア結果を追加</a>
       <a href="{{ url_for('add_event') }}" class="btn btn-primary">予約を追加</a>
     </div>
 
@@ -138,6 +151,7 @@
             {% for day in week %}
             {% set d = day.date %}
             {% set event = day.events[0] if day.events else None %}
+            {% set score_results = day.score_results %}
             <td class="calendar-cell position-relative
               {% if not day.in_month %}prev-month{% endif %}
               {% if day.is_today %} today{% endif %}
@@ -182,6 +196,22 @@
                  aria-label="{{ d.strftime('%Y-%m-%d') }} の予約を追加"
                  title="予約を追加">+</a>
               {% endif %}
+
+              {% if score_results %}
+              <div class="small mt-2 score-result-summary">
+                <div class="fw-bold">スコア結果 {{ score_results|length }}件</div>
+                {% for result in score_results[:2] %}
+                <a href="{{ url_for('score_result_detail', result_id=result.id) }}"
+                   class="d-block text-decoration-none score-result-link">
+                  {{ result.player_a }} vs {{ result.player_b }}: {{ result.score }}
+                </a>
+                {% endfor %}
+              </div>
+              {% endif %}
+              <div class="small mt-1">
+                <a href="{{ url_for('add_score_result', date=d.strftime('%Y-%m-%d')) }}"
+                   class="text-decoration-none add-score-link">スコア記録</a>
+              </div>
             </td>
             {% endfor %}
           </tr>
