@@ -193,7 +193,7 @@
                  title="予約を追加">+</a>
               {% endif %}
 
-              {% if event and score_results %}
+              {% if score_results %}
               <div class="small mt-2 score-result-summary">
                 {% for result in score_results %}
                 <a href="{{ url_for('score_result_detail', result_id=result.id) }}"
