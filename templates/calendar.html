@@ -108,16 +108,17 @@
       <a href="{{ url_for('show_calendar', year=year, month=month - 1) }}" class="btn btn-outline-secondary position-relative">
         前月
         {% if prev_reserved_days %}
-        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-              title="前月に {{ prev_reserved_days }} 日分の予約があります">+{{ prev_reserved_days }}</span>
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
+              title="前月に {{ prev_reserved_days }} 日分の予約があります">{{ prev_reserved_days }}</span>
         {% endif %}
       </a>
       <h1 class="h3 mb-0">{{ year }}年{{ month }}月</h1>
       <a href="{{ url_for('show_calendar', year=year, month=month + 1) }}" class="btn btn-outline-secondary position-relative">
         次月
         {% if next_reserved_days %}
-        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-              title="次月に {{ next_reserved_days }} 日分の予約があります">+{{ next_reserved_days }}</span>
+        <span id="nextMonthBadge"
+              class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
+              title="次月に {{ next_reserved_days }} 日分の予約があります">{{ next_reserved_days }}</span>
         {% endif %}
       </a>
     </div>
@@ -232,6 +233,8 @@
   <script>
     document.addEventListener("DOMContentLoaded", function() {
       const knownEventsKey = "knownEventIds";
+      // 次月以降のイベントID（サーバー提供）。未確認(=未読)が1件でもあれば次月バッジを赤にする。
+      const futureEventIds = {{ future_event_ids | tojson }};
       const currentEventIds = Array.from(document.querySelectorAll("[data-event-id]"))
         .map(function(element) { return element.dataset.eventId; })
         .filter(Boolean);
@@ -271,6 +274,16 @@
             badge.style.display = "none";
           }
         });
+
+        // 次月バッジ: 次月以降に未確認(未読)の予約があれば赤、なければ青。
+        const nextBadge = document.getElementById("nextMonthBadge");
+        if (nextBadge) {
+          const hasUnconfirmedFuture = futureEventIds.some(function(id) {
+            return !knownEvents.has(id);
+          });
+          nextBadge.classList.toggle("bg-danger", hasUnconfirmedFuture);
+          nextBadge.classList.toggle("bg-primary", !hasUnconfirmedFuture);
+        }
       }
 
       refreshBadges();

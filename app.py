@@ -277,6 +277,14 @@ def show_calendar():
     prev_year, prev_month = (year - 1, 12) if month == 1 else (year, month - 1)
     next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
 
+    # 次月以降(=次月の初日以降)のイベントIDを渡し、クライアント側で
+    # 未確認(=詳細未読)の予約が将来にあるかを判定して次月バッジを赤くする。
+    next_month_start = date(next_year, next_month, 1)
+    future_event_ids = [
+        str(row[0])
+        for row in db.session.query(Event.id).filter(Event.date >= next_month_start).all()
+    ]
+
     return render_template(
         "calendar.html",
         year=year,
@@ -285,6 +293,7 @@ def show_calendar():
         today=today,
         prev_reserved_days=count_reserved_days(prev_year, prev_month),
         next_reserved_days=count_reserved_days(next_year, next_month),
+        future_event_ids=future_event_ids,
     )
 
 
