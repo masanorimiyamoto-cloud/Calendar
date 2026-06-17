@@ -39,6 +39,9 @@ if "DATABASE_URL" in os.environ:
 APP_NAME = "千葉北テニスメンバー予約"
 ACCESS_CODE = os.environ.get("ACCESS_CODE", "chibakita")
 SCOREBOARD_URL = os.environ.get("SCOREBOARD_URL", "").strip()
+# スコアボード(別サイト)から /api/scores へ自動記録する際の共有トークン。
+# 未設定なら無認証で受け付ける（手軽さ優先。気になるなら本番で設定する）。
+SCORE_API_TOKEN = os.environ.get("SCORE_API_TOKEN", "").strip()
 DEFAULT_EVENT_TITLE = "千葉北"
 MAX_PARTICIPANTS = 4
 START_HOUR = 6
@@ -190,7 +193,7 @@ def inject_app_name():
 
 @app.before_request
 def require_login():
-    if request.endpoint in {"login", "static"} or request.endpoint is None:
+    if request.endpoint in {"login", "static", "api_add_score"} or request.endpoint is None:
         return None
     if session.get("authenticated"):
         return None
@@ -323,6 +326,53 @@ def add_score_result():
         date=selected_date,
         error_message=error_message,
     )
+
+
+def _score_api_cors_headers():
+    return {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, X-Score-Token",
+    }
+
+
+@app.route("/api/scores", methods=["POST", "OPTIONS"])
+def api_add_score():
+    """別サイトのスコアボードから当日のスコアを自動記録する API。
+
+    CORS 越しに呼ばれるため OPTIONS プリフライトに応答し、レスポンスにも
+    CORS ヘッダーを付ける。SCORE_API_TOKEN が設定されていれば検証する。
+    """
+    if request.method == "OPTIONS":
+        return ("", 204, _score_api_cors_headers())
+
+    if SCORE_API_TOKEN:
+        data_for_token = request.get_json(silent=True) or {}
+        token = request.headers.get("X-Score-Token", "") or str(data_for_token.get("token", ""))
+        if not hmac.compare_digest(token, SCORE_API_TOKEN):
+            return jsonify({"ok": False, "error": "unauthorized"}), 401, _score_api_cors_headers()
+
+    data = request.get_json(silent=True) or {}
+    player_a = str(data.get("player_a", "")).strip()
+    player_b = str(data.get("player_b", "")).strip()
+    score = str(data.get("score", "")).strip()
+    if not player_a or not player_b or not score:
+        return (
+            jsonify({"ok": False, "error": "player_a, player_b, score は必須です。"}),
+            400,
+            _score_api_cors_headers(),
+        )
+
+    result = ScoreResult(
+        date=now_jst().date(),
+        player_a=player_a[:100],
+        player_b=player_b[:100],
+        score=score[:200],
+        memo=None,
+    )
+    db.session.add(result)
+    db.session.commit()
+    return jsonify({"ok": True, "id": result.id}), 201, _score_api_cors_headers()
 
 
 @app.route("/scores/<int:result_id>")
