@@ -104,6 +104,12 @@
   </nav>
 
   <main class="container mt-4">
+    <a id="unconfirmedBanner" href="#" role="alert"
+       class="alert alert-danger d-flex d-none align-items-center justify-content-between text-decoration-none py-2 mb-3">
+      <span class="fw-bold">⚠️ 来月以降に未確認の予約が <span id="unconfirmedCount">0</span> 件あります</span>
+      <span class="btn btn-sm btn-danger ms-2 flex-shrink-0">確認する →</span>
+    </a>
+
     <div class="d-flex justify-content-between align-items-center mb-3">
       <a href="{{ url_for('show_calendar', year=year, month=month - 1) }}" class="btn btn-outline-secondary position-relative">
         前月
@@ -233,8 +239,9 @@
   <script>
     document.addEventListener("DOMContentLoaded", function() {
       const knownEventsKey = "knownEventIds";
-      // 次月以降のイベントID（サーバー提供）。未確認(=未読)が1件でもあれば次月バッジを赤にする。
-      const futureEventIds = {{ future_event_ids | tojson }};
+      // 次月以降のイベント（サーバー提供, 日付昇順）。各 {id, year, month}。
+      // 未確認(=未読)の予約があれば次月バッジを赤にし、上部に警告バナーを出す。
+      const futureEvents = {{ future_events | tojson }};
       const currentEventIds = Array.from(document.querySelectorAll("[data-event-id]"))
         .map(function(element) { return element.dataset.eventId; })
         .filter(Boolean);
@@ -275,14 +282,30 @@
           }
         });
 
-        // 次月バッジ: 次月以降に未確認(未読)の予約があれば赤、なければ青。
+        // 次月以降の未確認(未読)予約。日付昇順なので先頭が最も早い未確認。
+        const unconfirmedFuture = futureEvents.filter(function(e) {
+          return !knownEvents.has(e.id);
+        });
+
+        // 次月バッジ: 未確認の将来予約があれば赤、なければ青。
         const nextBadge = document.getElementById("nextMonthBadge");
         if (nextBadge) {
-          const hasUnconfirmedFuture = futureEventIds.some(function(id) {
-            return !knownEvents.has(id);
-          });
-          nextBadge.classList.toggle("bg-danger", hasUnconfirmedFuture);
-          nextBadge.classList.toggle("bg-primary", !hasUnconfirmedFuture);
+          const hasUnconfirmed = unconfirmedFuture.length > 0;
+          nextBadge.classList.toggle("bg-danger", hasUnconfirmed);
+          nextBadge.classList.toggle("bg-primary", !hasUnconfirmed);
+        }
+
+        // 上部の警告バナー: 未確認の将来予約があれば件数を出し、最も早い該当月へ誘導。
+        const banner = document.getElementById("unconfirmedBanner");
+        if (banner) {
+          if (unconfirmedFuture.length > 0) {
+            const earliest = unconfirmedFuture[0];
+            document.getElementById("unconfirmedCount").textContent = unconfirmedFuture.length;
+            banner.href = "{{ url_for('show_calendar') }}?year=" + earliest.year + "&month=" + earliest.month;
+            banner.classList.remove("d-none");
+          } else {
+            banner.classList.add("d-none");
+          }
         }
       }
 
