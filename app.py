@@ -298,6 +298,7 @@ def show_calendar():
         prev_reserved_days=count_reserved_days(prev_year, prev_month),
         next_reserved_days=count_reserved_days(next_year, next_month),
         future_events=future_events,
+        last_updated=now_jst().strftime("%Y/%m/%d %H:%M"),
     )
 
 
