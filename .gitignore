@@ -6,3 +6,6 @@ python-*.exe
 python-install*.log
 server.log
 server.err.log
+
+# ローカルのデータベース（アプリが読み書きする実データ。追跡しない）
+instance/*.db
