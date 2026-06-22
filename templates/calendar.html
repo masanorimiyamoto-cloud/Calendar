@@ -104,12 +104,6 @@
   </nav>
 
   <main class="container mt-4">
-    <a id="unconfirmedBanner" href="#" role="alert"
-       class="alert alert-danger d-flex d-none align-items-center justify-content-between text-decoration-none py-2 mb-3">
-      <span class="fw-bold">⚠️ 来月以降に未確認の予約が <span id="unconfirmedCount">0</span> 件あります</span>
-      <span class="btn btn-sm btn-danger ms-2 flex-shrink-0">確認する →</span>
-    </a>
-
     <div class="d-flex justify-content-between align-items-center mb-3">
       <a href="{{ url_for('show_calendar', year=year, month=month - 1) }}" class="btn btn-outline-secondary position-relative">
         前月
@@ -134,8 +128,13 @@
       <a href="{{ url_for('add_event') }}" class="btn btn-primary">予約を追加</a>
     </div>
 
-    <div class="text-center text-muted small mb-4">
+    <div class="text-center text-muted small mb-1">
 {{ last_updated }} 時点の情報です
+    </div>
+    <div class="text-center small mb-4">
+      <a id="unconfirmedBanner" href="#" class="d-none text-danger text-decoration-none">
+        ⚠️ 未確認の新規コート予約情報が <span id="unconfirmedCount">0</span> 件あります
+      </a>
     </div>
 
     <form method="get" action="{{ url_for('show_calendar') }}" class="d-flex justify-content-center mb-4">
@@ -299,7 +298,7 @@
           nextBadge.classList.toggle("bg-primary", !hasUnconfirmed);
         }
 
-        // 上部の警告バナー: 未確認の将来予約があれば件数を出し、最も早い該当月へ誘導。
+        // 未確認の通知: 未確認の将来予約があれば件数を出し、最も早い該当月へ誘導。
         const banner = document.getElementById("unconfirmedBanner");
         if (banner) {
           if (unconfirmedFuture.length > 0) {
