@@ -50,6 +50,38 @@
         {% if event.description %}
         <p class="card-text">{{ event.description }}</p>
         {% endif %}
+
+        <div class="border rounded p-3 mt-3 mb-3" id="status-section">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="fw-bold">開催状況</span>
+            {% set status_badge = {'scheduled': 'bg-success', 'hold': 'bg-warning text-dark', 'cancelled': 'bg-danger'} %}
+            <span id="status-badge" class="badge {{ status_badge.get(event.status, 'bg-success') }}">{{ event.status_label }}</span>
+          </div>
+          <div class="btn-group mt-2 w-100" role="group" aria-label="開催状況">
+            {% for value, label, active_class, outline_class in [
+              ('scheduled', '開催予定', 'btn-success', 'btn-outline-success'),
+              ('hold', '保留', 'btn-warning', 'btn-outline-warning'),
+              ('cancelled', '中止', 'btn-danger', 'btn-outline-danger')
+            ] %}
+            <button type="button"
+                    class="btn status-button {% if event.status == value %}{{ active_class }}{% else %}{{ outline_class }}{% endif %}"
+                    data-status="{{ value }}"
+                    data-active-class="{{ active_class }}"
+                    data-outline-class="{{ outline_class }}">{{ label }}</button>
+            {% endfor %}
+          </div>
+          <div class="mt-2">
+            <label for="status-note" class="form-label small mb-1 text-muted">一言メモ（任意・天候や判断時刻など）</label>
+            <textarea id="status-note" class="form-control form-control-sm" rows="2" maxlength="200"
+                      placeholder="例）雨予報のため7時に最終判断します">{{ event.status_note or '' }}</textarea>
+          </div>
+          <button type="button" id="status-save" class="btn btn-sm btn-primary mt-2">この内容で更新</button>
+          <div id="status-error" class="alert alert-danger d-none mt-2 mb-0"></div>
+          <div id="status-updated" class="small text-muted mt-1">
+            {% if event.status_updated_at %}最終更新: {{ event.status_updated_at.strftime('%Y/%m/%d %H:%M') }}{% endif %}
+          </div>
+        </div>
+
         <p class="card-text">
           参加: <span id="attending-count" class="fw-bold">{{ event.attending_count }}</span> / {{ max_participants }} 名
         </p>
@@ -194,6 +226,80 @@
         }
       });
     });
+
+    // ===== 開催状況（開催予定/保留/中止） =====
+    const statusBadgeClassMap = {
+      scheduled: ["bg-success"],
+      hold: ["bg-warning", "text-dark"],
+      cancelled: ["bg-danger"]
+    };
+    let selectedStatus = "{{ event.status or 'scheduled' }}";
+
+    const statusButtons = document.querySelectorAll(".status-button");
+
+    function highlightStatusButtons() {
+      statusButtons.forEach(button => {
+        const isActive = button.dataset.status === selectedStatus;
+        button.classList.remove(button.dataset.activeClass, button.dataset.outlineClass);
+        button.classList.add(isActive ? button.dataset.activeClass : button.dataset.outlineClass);
+      });
+    }
+
+    statusButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        selectedStatus = button.dataset.status;
+        highlightStatusButtons();
+      });
+    });
+
+    function showStatusError(message) {
+      const box = document.getElementById("status-error");
+      box.textContent = message;
+      box.classList.remove("d-none");
+    }
+
+    const statusSaveButton = document.getElementById("status-save");
+    if (statusSaveButton) {
+      statusSaveButton.addEventListener("click", async () => {
+        document.getElementById("status-error").classList.add("d-none");
+        const note = document.getElementById("status-note").value;
+        const originalText = statusSaveButton.textContent;
+        statusSaveButton.disabled = true;
+        statusSaveButton.textContent = "更新中";
+
+        const body = new FormData();
+        body.append("status", selectedStatus);
+        body.append("note", note);
+
+        try {
+          const response = await fetch("{{ url_for('update_event_status', event_id=event.id) }}", {
+            method: "POST",
+            body: body,
+            headers: { "X-Requested-With": "fetch" }
+          });
+          const data = await response.json();
+
+          if (!response.ok || !data.ok) {
+            showStatusError(data.error || "更新に失敗しました。");
+            return;
+          }
+
+          const badge = document.getElementById("status-badge");
+          badge.className = "badge";
+          statusBadgeClassMap[data.status].forEach(className => badge.classList.add(className));
+          badge.textContent = data.status_label;
+
+          document.getElementById("status-updated").textContent = "最終更新: " + data.updated_at;
+          // 自分の更新は既読扱いにし、カレンダーで自分に「変更」バッジが付かないようにする。
+          localStorage.setItem(eventSeenKey, data.change_version);
+        } catch {
+          showStatusError("通信に失敗しました。時間をおいてもう一度お試しください。");
+        } finally {
+          statusSaveButton.disabled = false;
+          statusSaveButton.textContent = originalText;
+        }
+      });
+    }
   </script>
 </body>
 </html>

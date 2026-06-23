@@ -189,11 +189,16 @@
 
               {% if event %}
               <span class="badge rounded-pill bg-primary new-event-badge">新規</span>
+              {% if event.status == 'cancelled' %}
+              <div class="mt-1"><span class="badge bg-danger">中止</span></div>
+              {% elif event.status == 'hold' %}
+              <div class="mt-1"><span class="badge bg-warning text-dark">保留</span></div>
+              {% endif %}
               <div class="small mt-2">
                 <a href="{{ url_for('event_detail', event_id=event.id) }}"
                    class="text-decoration-none stretched-link event-detail-link"
                    data-event-id="{{ event.id }}">
-                  <span class="fw-bold event-title">{{ event.title }}</span>
+                  <span class="fw-bold event-title {% if event.status == 'cancelled' %}text-muted text-decoration-line-through{% endif %}">{{ event.title }}</span>
                 </a>
               </div>
               {% if event.time_range %}
