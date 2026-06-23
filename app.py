@@ -43,6 +43,13 @@ SCOREBOARD_URL = os.environ.get("SCOREBOARD_URL", "").strip()
 # 未設定なら無認証で受け付ける（手軽さ優先。気になるなら本番で設定する）。
 SCORE_API_TOKEN = os.environ.get("SCORE_API_TOKEN", "").strip()
 DEFAULT_EVENT_TITLE = "千葉北"
+# 開催判断のステータス。天候などで当日に中止/保留を共有するために使う。
+# 既定は「開催予定」で、カレンダー上は無印（特別な日だけ目立たせる）。
+EVENT_STATUSES = {
+    "scheduled": "開催予定",
+    "hold": "保留",
+    "cancelled": "中止",
+}
 MAX_PARTICIPANTS = 4
 START_HOUR = 6
 END_HOUR = 22
@@ -58,6 +65,10 @@ class Event(db.Model):
     end_time = db.Column(db.String(5))
     change_version = db.Column(db.Integer, nullable=False, default=0)
     description = db.Column(db.Text)
+    # 開催判断（開催予定/保留/中止）と、その一言メモ・最終更新時刻。
+    status = db.Column(db.String(20), nullable=False, default="scheduled")
+    status_note = db.Column(db.String(200))
+    status_updated_at = db.Column(db.DateTime)
     participants = db.relationship(
         "Participant",
         back_populates="event",
@@ -78,6 +89,15 @@ class Event(db.Model):
         if self.start_time and self.end_time:
             return f"{self.start_time} - {self.end_time}"
         return ""
+
+    @property
+    def status_label(self):
+        return EVENT_STATUSES.get(self.status or "scheduled", "開催予定")
+
+    @property
+    def is_special_status(self):
+        """開催予定（通常）以外＝目立たせるべき状態か。"""
+        return (self.status or "scheduled") != "scheduled"
 
 
 class Participant(db.Model):
@@ -157,6 +177,35 @@ def ensure_event_time_columns():
         db.session.commit()
 
 
+def ensure_event_status_columns():
+    """event テーブルに開催ステータス用の列が無ければ追加する。
+
+    本番 (DATABASE_URL あり) では db.create_all() を実行しないため、
+    後から追加したこれらの列を起動時に冪等に補う。これを怠ると
+    show_calendar / event_detail の Event クエリが失敗する。
+    """
+    inspector = inspect(db.engine)
+    if not inspector.has_table("event"):
+        return
+    existing_columns = {column["name"] for column in inspector.get_columns("event")}
+    statements = []
+
+    if "status" not in existing_columns:
+        statements.append(
+            "ALTER TABLE event ADD COLUMN status VARCHAR(20) DEFAULT 'scheduled' NOT NULL"
+        )
+    if "status_note" not in existing_columns:
+        statements.append("ALTER TABLE event ADD COLUMN status_note VARCHAR(200)")
+    if "status_updated_at" not in existing_columns:
+        statements.append("ALTER TABLE event ADD COLUMN status_updated_at TIMESTAMP")
+
+    for statement in statements:
+        db.session.execute(text(statement))
+
+    if statements:
+        db.session.commit()
+
+
 def should_initialize_database():
     if os.environ.get("INIT_DB") == "1":
         return True
@@ -182,6 +231,7 @@ with app.app_context():
             db.create_all()
             ensure_event_time_columns()
         ensure_score_result_table()
+        ensure_event_status_columns()
     except Exception as exc:  # noqa: BLE001
         app.logger.warning("データベース初期化をスキップしました: %s", exc)
 
@@ -577,6 +627,45 @@ def update_attendance(event_id):
         "status": status,
         "attending_count": attending_count,
         "max_participants": MAX_PARTICIPANTS,
+        "change_version": event.change_version or 0,
+    })
+
+
+@app.route("/event/<int:event_id>/status", methods=["POST"])
+def update_event_status(event_id):
+    """開催判断（開催予定/保留/中止）と一言メモを更新する。
+
+    メンバーなら誰でも平等に更新できる（個人ログインは無い）。
+    状態またはメモが実際に変わった時だけ change_version を進め、
+    既存の「変更」バッジ／未確認バナーで他のメンバーに知らせる。
+    """
+    status = request.form.get("status", "")
+    note = request.form.get("note", "").strip()
+
+    if status not in EVENT_STATUSES:
+        return jsonify({"ok": False, "error": "不正な操作です。"}), 400
+
+    event = Event.query.filter_by(id=event_id).first()
+    if not event:
+        return jsonify({"ok": False, "error": "予約が見つかりません。"}), 404
+
+    note = note[:200]
+    changed = (event.status or "scheduled") != status or (event.status_note or "") != note
+
+    event.status = status
+    event.status_note = note or None
+    event.status_updated_at = now_jst()
+    if changed:
+        event.change_version = (event.change_version or 0) + 1
+
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "status": status,
+        "status_label": EVENT_STATUSES[status],
+        "note": event.status_note or "",
+        "updated_at": event.status_updated_at.strftime("%Y/%m/%d %H:%M"),
         "change_version": event.change_version or 0,
     })
 
