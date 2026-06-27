@@ -52,11 +52,19 @@
       z-index: 4;
     }
     @keyframes cell-spin { to { transform: rotate(360deg); } }
-    /* 遷移中に押した要素を一時的に沈ませ、二度押しを抑える。 */
-    .btn.navigating, .add-day-link.navigating {
-      opacity: 0.65;
-      pointer-events: none;
+    /* ボタンの押下・遷移中の反応はさりげなく。デフォルト色から控えめに変える。 */
+    .btn.pressed, .btn.navigating { transform: scale(0.98); }
+    .btn.navigating, .add-day-link.navigating { pointer-events: none; }
+    /* 前月・次月など outline 系: ほんのり沈むグレー。 */
+    .btn-outline-secondary.pressed,
+    .btn-outline-secondary.navigating {
+      background-color: #f1f3f5;
+      border-color: #ced4da;
+      color: #495057;
     }
+    /* 塗りボタン（今月・予約を追加）は気持ち暗くするだけ。 */
+    .btn-primary.pressed, .btn-primary.navigating,
+    .btn-info.pressed, .btn-info.navigating { filter: brightness(0.94); }
     /* 応答が遅いときだけ出る全画面ローディング。速い遷移では出さない。 */
     #loadingOverlay {
       position: fixed;
@@ -404,16 +412,20 @@
       });
 
       // 押した瞬間の反応。pointer 系イベントでマウス・タッチ両対応にする。
-      document.querySelectorAll(".calendar-cell").forEach(function(cell) {
-        cell.addEventListener("pointerdown", function() {
-          cell.classList.add("pressed");
-        });
-        ["pointerup", "pointercancel", "pointerleave"].forEach(function(type) {
-          cell.addEventListener(type, function() {
-            cell.classList.remove("pressed");
+      function addPressFeedback(elements) {
+        elements.forEach(function(el) {
+          el.addEventListener("pointerdown", function() {
+            el.classList.add("pressed");
+          });
+          ["pointerup", "pointercancel", "pointerleave"].forEach(function(type) {
+            el.addEventListener(type, function() {
+              el.classList.remove("pressed");
+            });
           });
         });
-      });
+      }
+      addPressFeedback(document.querySelectorAll(".calendar-cell"));
+      addPressFeedback(document.querySelectorAll(".btn"));
 
       // 画面遷移の操作に共通の「反応」を与える。
       //  1) 押した要素／セルをはっきり青くして「効いた」ことを即座に示す
