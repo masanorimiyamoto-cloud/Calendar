@@ -1,0 +1,95 @@
+{# 全ページ共通のボタン反応＋遷移中ローディング。各ページの </body> 直前で include する。
+   - 押した瞬間に控えめな色変化（マウス・タッチ共通）
+   - サーバー応答が遅いときだけ全画面スピナーを出し、二度押しを防ぐ
+   - confirm キャンセルや AJAX 送信（preventDefault）では反応させない #}
+<style>
+  .btn { -webkit-tap-highlight-color: transparent; }
+  /* 押下・遷移中はさりげなく沈ませる（デフォルト色から控えめに変化）。 */
+  .btn.pressed, .btn.navigating { transform: scale(0.98); filter: brightness(0.93); }
+  .btn.navigating { pointer-events: none; }
+
+  /* 応答が遅いときだけ出る全画面ローディング。速い遷移では出さない。 */
+  #loadingOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1080;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.6);
+  }
+  #loadingOverlay.show { display: flex; }
+  #loadingOverlay .spinner-border { color: #0d6efd; width: 3rem; height: 3rem; }
+</style>
+
+<div id="loadingOverlay" aria-hidden="true">
+  <div class="spinner-border" role="status">
+    <span class="visually-hidden">読み込み中…</span>
+  </div>
+</div>
+
+<script>
+  (function() {
+    document.addEventListener("DOMContentLoaded", function() {
+      // 押した瞬間の反応。pointer 系イベントでマウス・タッチ両対応にする。
+      document.querySelectorAll(".btn").forEach(function(btn) {
+        btn.addEventListener("pointerdown", function() {
+          btn.classList.add("pressed");
+        });
+        ["pointerup", "pointercancel", "pointerleave"].forEach(function(type) {
+          btn.addEventListener(type, function() {
+            btn.classList.remove("pressed");
+          });
+        });
+      });
+
+      // 遷移中（サーバー応答待ち）の表示。
+      //  - 押した要素を沈ませて「効いた」ことを示す
+      //  - 180ms 以上かかる時だけ全画面スピナーを出す（速い遷移では出さない）
+      var overlay = document.getElementById("loadingOverlay");
+      var overlayTimer = null;
+
+      function startNavigation(target) {
+        if (target) {
+          target.classList.add("navigating");
+        }
+        if (overlayTimer === null) {
+          overlayTimer = window.setTimeout(function() {
+            overlay.classList.add("show");
+          }, 180);
+        }
+      }
+
+      // ページ遷移を伴うリンク（同一ページ内アンカー #... と別タブは除く）。
+      document.querySelectorAll("a[href]:not([href^='#']):not([target='_blank'])").forEach(function(link) {
+        link.addEventListener("click", function() {
+          startNavigation(link);
+        });
+      });
+
+      // フォーム送信。confirm キャンセルや AJAX(preventDefault) の時は反応させない。
+      // このリスナは DOMContentLoaded で登録されるため、属性 onsubmit や
+      // ページ側スクリプト（パース時登録）より後に実行され、defaultPrevented を見られる。
+      document.querySelectorAll("form").forEach(function(form) {
+        form.addEventListener("submit", function(event) {
+          if (event.defaultPrevented) {
+            return;
+          }
+          startNavigation(event.submitter || form.querySelector("[type='submit']"));
+        });
+      });
+
+      // bfcache 復元・リロード時に表示が残らないよう必ず消す。
+      window.addEventListener("pageshow", function() {
+        if (overlayTimer !== null) {
+          window.clearTimeout(overlayTimer);
+          overlayTimer = null;
+        }
+        overlay.classList.remove("show");
+        document.querySelectorAll(".navigating").forEach(function(el) {
+          el.classList.remove("navigating");
+        });
+      });
+    });
+  })();
+</script>
