@@ -27,16 +27,16 @@
       box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.16);
     }
     .calendar-cell:hover { background-color: #f8f9fa; }
-    /* タップ／クリックした瞬間の反応（マウス・タッチ共通）。はっきり青く沈める。 */
+    /* タップ／クリックした瞬間の反応（マウス・タッチ共通）。さりげなく青く沈める。 */
     .calendar-cell.pressed {
-      transform: scale(0.97);
-      background-color: #cfe2ff;
-      box-shadow: inset 0 0 0 2px #0d6efd;
+      transform: scale(0.98);
+      background-color: #eaf3ff;
+      box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.35);
     }
     /* 画面遷移中（サーバー応答待ち）の状態。押下が確実に伝わったことを示す。 */
     .calendar-cell.navigating {
-      background-color: #cfe2ff !important;
-      box-shadow: inset 0 0 0 2px #0d6efd;
+      background-color: #eaf3ff !important;
+      box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.35);
     }
     .calendar-cell.navigating::after {
       content: "";
