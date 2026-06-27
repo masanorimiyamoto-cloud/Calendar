@@ -16,7 +16,10 @@
       padding: 8px;
     }
     .calendar-table th { background-color: #f8f9fa; text-align: center; }
-    .calendar-cell { transition: transform 0.1s ease, background-color 0.1s ease; }
+    .calendar-cell {
+      transition: transform 0.08s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
     .calendar-cell.has-event { cursor: pointer; background-color: #f6fbff; }
     .calendar-cell.new-event {
       outline: 2px solid #0d6efd;
@@ -24,7 +27,48 @@
       box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.16);
     }
     .calendar-cell:hover { background-color: #f8f9fa; }
-    .calendar-cell.pressed { transform: scale(0.98); background-color: #e9ecef; }
+    /* タップ／クリックした瞬間の反応（マウス・タッチ共通）。はっきり青く沈める。 */
+    .calendar-cell.pressed {
+      transform: scale(0.97);
+      background-color: #cfe2ff;
+      box-shadow: inset 0 0 0 2px #0d6efd;
+    }
+    /* 画面遷移中（サーバー応答待ち）の状態。押下が確実に伝わったことを示す。 */
+    .calendar-cell.navigating {
+      background-color: #cfe2ff !important;
+      box-shadow: inset 0 0 0 2px #0d6efd;
+    }
+    .calendar-cell.navigating::after {
+      content: "";
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(13, 110, 253, 0.35);
+      border-top-color: #0d6efd;
+      border-radius: 50%;
+      animation: cell-spin 0.6s linear infinite;
+      z-index: 4;
+    }
+    @keyframes cell-spin { to { transform: rotate(360deg); } }
+    /* 遷移中に押した要素を一時的に沈ませ、二度押しを抑える。 */
+    .btn.navigating, .add-day-link.navigating {
+      opacity: 0.65;
+      pointer-events: none;
+    }
+    /* 応答が遅いときだけ出る全画面ローディング。速い遷移では出さない。 */
+    #loadingOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1080;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.6);
+    }
+    #loadingOverlay.show { display: flex; }
+    #loadingOverlay .spinner-border { color: #0d6efd; width: 3rem; height: 3rem; }
     .today { background-color: #fff3cd; outline: 2px solid #ffc107; outline-offset: -2px; }
     .today-badge { font-size: 0.68rem; vertical-align: middle; }
     .holiday, .sunday { color: #dc3545; }
@@ -243,6 +287,12 @@
     </div>
   </footer>
 
+  <div id="loadingOverlay" aria-hidden="true">
+    <div class="spinner-border" role="status">
+      <span class="visually-hidden">読み込み中…</span>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
@@ -353,17 +403,65 @@
         });
       });
 
+      // 押した瞬間の反応。pointer 系イベントでマウス・タッチ両対応にする。
       document.querySelectorAll(".calendar-cell").forEach(function(cell) {
-        cell.addEventListener("mousedown", function() {
+        cell.addEventListener("pointerdown", function() {
           cell.classList.add("pressed");
         });
-        cell.addEventListener("mouseup", function() {
-          cell.classList.remove("pressed");
-        });
-        cell.addEventListener("mouseleave", function() {
-          cell.classList.remove("pressed");
+        ["pointerup", "pointercancel", "pointerleave"].forEach(function(type) {
+          cell.addEventListener(type, function() {
+            cell.classList.remove("pressed");
+          });
         });
       });
+
+      // 画面遷移の操作に共通の「反応」を与える。
+      //  1) 押した要素／セルをはっきり青くして「効いた」ことを即座に示す
+      //  2) 応答が遅いときだけ全画面スピナーを出し、二度押しを防ぐ
+      // 速い遷移ではスピナーが一瞬も出ないよう、表示は少し遅らせる。
+      const overlay = document.getElementById("loadingOverlay");
+      let overlayTimer = null;
+
+      function startNavigation(target) {
+        const cell = target.closest(".calendar-cell");
+        if (cell) {
+          cell.classList.remove("pressed");
+          cell.classList.add("navigating");
+        } else {
+          target.classList.add("navigating");
+        }
+        if (overlayTimer === null) {
+          overlayTimer = window.setTimeout(function() {
+            overlay.classList.add("show");
+          }, 180);
+        }
+      }
+
+      // 遷移を伴うリンク・ボタン（同一ページ内アンカー #... は除く）。
+      const navSelector =
+        "a[href]:not([href^='#']):not([target='_blank']), " +
+        "form button[type='submit'], " +
+        ".form-select";
+
+      document.querySelectorAll(navSelector).forEach(function(el) {
+        const eventType = el.classList.contains("form-select") ? "change" : "click";
+        el.addEventListener(eventType, function() {
+          startNavigation(el);
+        });
+      });
+
+      // bfcache 復元やリロード時にスピナー／遷移状態が残らないよう必ず消す。
+      function clearNavigation() {
+        if (overlayTimer !== null) {
+          window.clearTimeout(overlayTimer);
+          overlayTimer = null;
+        }
+        overlay.classList.remove("show");
+        document.querySelectorAll(".navigating").forEach(function(el) {
+          el.classList.remove("navigating");
+        });
+      }
+      window.addEventListener("pageshow", clearNavigation);
     });
   </script>
 </body>
