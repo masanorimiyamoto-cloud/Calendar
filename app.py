@@ -180,8 +180,9 @@ def ensure_event_time_columns():
 def ensure_event_status_columns():
     """event テーブルに開催ステータス用の列が無ければ追加する。
 
-    本番 (DATABASE_URL あり) では db.create_all() を実行しないため、
-    後から追加したこれらの列を起動時に冪等に補う。これを怠ると
+    db.create_all() では既存テーブルに列は追加されないため、
+    後から追加したこれらの列を冪等に補う。本番 (DATABASE_URL あり) では
+    INIT_DB=1 を設定した時だけ実行される。これらの列が無いと
     show_calendar / event_detail の Event クエリが失敗する。
     """
     inspector = inspect(db.engine)
@@ -215,23 +216,27 @@ def should_initialize_database():
 def ensure_score_result_table():
     """score_result テーブルが無ければ作成する。
 
-    本番 (DATABASE_URL あり) では db.create_all() を実行しないため、
-    後から追加したこのテーブルだけは起動時に冪等に作成しておく。
-    これを怠ると show_calendar の ScoreResult クエリが失敗し、
-    カレンダー全体が 500 になる。
+    後から追加したこのテーブルを冪等に作成する。本番 (DATABASE_URL あり)
+    では INIT_DB=1 を設定した時だけ実行される。このテーブルが無いと
+    show_calendar の ScoreResult クエリが失敗し、カレンダー全体が
+    500 になる。
     """
     inspector = inspect(db.engine)
     if not inspector.has_table("score_result"):
         ScoreResult.__table__.create(db.engine)
 
 
+# 本番 (DATABASE_URL あり) ではスキーマは既に整っているため、起動時の
+# チェックは行わない。コールドスタート時の DB 往復を減らし、Vercel の
+# タイムアウト (504) を防ぐ。スキーマ変更を反映したい時だけ INIT_DB=1 を
+# 設定して一度デプロイ（またはアクセス）すればよい。
 with app.app_context():
     try:
         if should_initialize_database():
             db.create_all()
             ensure_event_time_columns()
-        ensure_score_result_table()
-        ensure_event_status_columns()
+            ensure_score_result_table()
+            ensure_event_status_columns()
     except Exception as exc:  # noqa: BLE001
         app.logger.warning("データベース初期化をスキップしました: %s", exc)
 
