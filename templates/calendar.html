@@ -302,12 +302,16 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  {# 次月以降のイベント（サーバー提供, 日付昇順）。各 {id, year, month}。
+     JS 内に Jinja 構文を書くとエディタが構文エラーと誤認するため、
+     JSON として別タグに埋め込み、JS 側で parse する。 #}
+  <script id="futureEventsData" type="application/json">{{ future_events | tojson }}</script>
   <script>
     document.addEventListener("DOMContentLoaded", function() {
       const knownEventsKey = "knownEventIds";
-      // 次月以降のイベント（サーバー提供, 日付昇順）。各 {id, year, month}。
-      // 未確認(=未読)の予約があれば次月バッジを赤にし、上部に警告バナーを出す。
-      const futureEvents = {{ future_events | tojson }};
+      // 次月以降のイベント。未確認(=未読)の予約があれば次月バッジを赤にし、
+      // 上部に警告バナーを出す。
+      const futureEvents = JSON.parse(document.getElementById("futureEventsData").textContent);
       const currentEventIds = Array.from(document.querySelectorAll("[data-event-id]"))
         .map(function(element) { return element.dataset.eventId; })
         .filter(Boolean);
