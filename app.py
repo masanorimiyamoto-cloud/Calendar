@@ -29,6 +29,10 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
 }
+# ログイン状態を長く保持する（既定だとブラウザを閉じるだけでCookieが失効し、
+# 合言葉の再入力を求められる頻度が高くなっていたため）。
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=180)
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 if "DATABASE_URL" in os.environ:
     app.config["SQLALCHEMY_ENGINE_OPTIONS"].update({
         "pool_size": 1,
@@ -267,6 +271,7 @@ def login():
     if request.method == "POST":
         code = request.form.get("access_code", "")
         if hmac.compare_digest(code, ACCESS_CODE):
+            session.permanent = True
             session["authenticated"] = True
             return redirect(next_url)
         error_message = "合言葉が違います。"
