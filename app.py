@@ -255,6 +255,10 @@ def require_login():
     if request.endpoint in {"login", "static", "api_add_score"} or request.endpoint is None:
         return None
     if session.get("authenticated"):
+        # 修正前にログイン済みだった人のセッションは一時Cookieのままなので、
+        # 次のアクセス時に永続Cookieへ自動で切り替える（再ログイン不要）。
+        if not session.permanent:
+            session.permanent = True
         return None
     if request.headers.get("X-Requested-With") == "fetch":
         return jsonify({"ok": False, "error": "ログインしてください。"}), 401
