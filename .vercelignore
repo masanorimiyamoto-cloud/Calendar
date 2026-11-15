@@ -1,0 +1,11 @@
+.venv
+.python312
+__pycache__
+*.py[cod]
+instance
+server.log
+server.err.log
+python-*.exe
+python-install*.log
+.env*
+.vscode

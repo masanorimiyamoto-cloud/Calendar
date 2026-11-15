@@ -22,7 +22,13 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 # Production uses DATABASE_URL, typically PostgreSQL on Vercel/Neon.
 # Local development falls back to instance/events.db.
 database_url = os.environ.get("DATABASE_URL", "sqlite:///events.db")
-database_url = database_url.replace("postgres://", "postgresql://")
+# ドライバ (psycopg2) を URL で明示する。SQLAlchemy 2.1 以降は "postgresql://" の
+# 既定ドライバが psycopg (v3) に変わり、未インストールのため起動時に落ちる
+# (2026-11 の 500 FUNCTION_INVOCATION_FAILED の原因)。
+if database_url.startswith("postgres://"):
+    database_url = "postgresql+psycopg2://" + database_url[len("postgres://"):]
+elif database_url.startswith("postgresql://"):
+    database_url = "postgresql+psycopg2://" + database_url[len("postgresql://"):]
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -33,7 +39,13 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 # 合言葉の再入力を求められる頻度が高くなっていたため）。
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=180)
 app.config["SESSION_REFRESH_EACH_REQUEST"] = True
+# 他サイトから勝手にフォーム送信（予約削除など）されないよう、Cookie は
+# 同一サイトからの POST にしか付けない。LINE 等のリンクから開く通常の
+# 遷移(GET)ではログイン状態は保たれる。
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 if "DATABASE_URL" in os.environ:
+    # 本番 (Vercel) は HTTPS のみなので、Cookie も HTTPS 限定にする。
+    app.config["SESSION_COOKIE_SECURE"] = True
     app.config["SQLALCHEMY_ENGINE_OPTIONS"].update({
         "pool_size": 1,
         "max_overflow": 2,
@@ -341,16 +353,32 @@ def show_calendar():
     prev_year, prev_month = (year - 1, 12) if month == 1 else (year, month - 1)
     next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
 
-    # 次月以降(=次月の初日以降)のイベントを渡し、クライアント側で
-    # 未確認(=詳細未読)の予約が将来にあるかを判定する。
-    # 次月バッジの赤/青と、上部の警告バナー(件数・遷移先の月)に使う。
+    # 前月の初日以降の予約 (id, 日付) を 1 回のクエリでまとめて取り、
+    #  - 前月/次月ボタン横の「予約日数」
+    #  - 次月以降の予約一覧（クライアント側で未確認の予約を判定し、
+    #    次月バッジの赤/青と上部の警告バナーに使う）
+    # を Python 側で求める。DB 往復を減らしてコールドスタート時の応答を速くする。
+    # Event.date は unique なので、行数 = 予約日数。
+    prev_month_start = date(prev_year, prev_month, 1)
+    this_month_start = date(year, month, 1)
     next_month_start = date(next_year, next_month, 1)
-    future_events = [
-        {"id": str(e.id), "year": e.date.year, "month": e.date.month}
-        for e in db.session.query(Event.id, Event.date)
-        .filter(Event.date >= next_month_start)
+    month_after_next_start = (
+        date(next_year + 1, 1, 1) if next_month == 12 else date(next_year, next_month + 1, 1)
+    )
+    nearby_events = (
+        db.session.query(Event.id, Event.date)
+        .filter(Event.date >= prev_month_start)
         .order_by(Event.date)
         .all()
+    )
+    prev_reserved_days = sum(1 for _, d in nearby_events if d < this_month_start)
+    next_reserved_days = sum(
+        1 for _, d in nearby_events if next_month_start <= d < month_after_next_start
+    )
+    future_events = [
+        {"id": str(event_id), "year": d.year, "month": d.month}
+        for event_id, d in nearby_events
+        if d >= next_month_start
     ]
 
     return render_template(
@@ -359,25 +387,10 @@ def show_calendar():
         month=month,
         month_days=month_days,
         today=today,
-        prev_reserved_days=count_reserved_days(prev_year, prev_month),
-        next_reserved_days=count_reserved_days(next_year, next_month),
+        prev_reserved_days=prev_reserved_days,
+        next_reserved_days=next_reserved_days,
         future_events=future_events,
         last_updated=now_jst().strftime("%Y/%m/%d %H:%M"),
-    )
-
-
-def count_reserved_days(year, month):
-    """指定した年月のうち、予約が入っている日数を返す。
-
-    隣月に予約があることを 前月/次月 ボタンの近くで知らせるために使う。
-    """
-    first = date(year, month, 1)
-    last = date(year, month, calendar.monthrange(year, month)[1])
-    return (
-        db.session.query(Event.date)
-        .filter(Event.date >= first, Event.date <= last)
-        .distinct()
-        .count()
     )
 
 
