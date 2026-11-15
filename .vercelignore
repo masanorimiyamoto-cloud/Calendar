@@ -9,3 +9,4 @@ python-*.exe
 python-install*.log
 .env*
 .vscode
+tests

@@ -10,10 +10,19 @@ JST = timezone(timedelta(hours=9))
 def now_jst():
     return datetime.now(JST)
 
+
+def now_jst_naive():
+    """DB の DateTime 列（タイムゾーン無し）に保存するための JST 現在時刻。
+
+    タイムゾーン付きの値を渡すと PostgreSQL がセッションのタイムゾーン
+    (Neon の既定は UTC) に変換してから保存するため、表示が 9 時間ずれる。
+    """
+    return now_jst().replace(tzinfo=None)
+
 import jpholiday
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import inspect, text
+from sqlalchemy import func, inspect, select, text, update
 
 
 app = Flask(__name__)
@@ -67,6 +76,8 @@ EVENT_STATUSES = {
     "cancelled": "中止",
 }
 MAX_PARTICIPANTS = 4
+EVENT_FULL_MESSAGE = f"参加は最大 {MAX_PARTICIPANTS} 名までです。"
+ATTENDANCE_STATUSES = ("attend", "absent", "undecided")
 START_HOUR = 6
 END_HOUR = 22
 
@@ -142,7 +153,7 @@ class ScoreResult(db.Model):
     player_b = db.Column(db.String(100), nullable=False)
     score = db.Column(db.String(200), nullable=False)
     memo = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, nullable=False, default=now_jst)
+    created_at = db.Column(db.DateTime, nullable=False, default=now_jst_naive)
 
 
 def build_time_options():
@@ -545,6 +556,105 @@ def add_event():
     )
 
 
+class EventNotFoundError(Exception):
+    """ロックしようとした予約が存在しない（同時に削除された等）。"""
+
+
+class EventFullError(Exception):
+    """参加者が定員に達していて「参加」にできない。"""
+
+
+def lock_event_row(event_id):
+    """予約本体の行を排他ロックする。予約が存在すれば True。
+
+    同じ予約に対する出欠・開催状況の更新を DB 側で直列化するために使う。
+    ロックはトランザクションの commit / rollback まで保持される。
+
+    PostgreSQL: SELECT event.id ... FOR UPDATE。Event.participants は
+    lazy="joined" のため Event エンティティごと FOR UPDATE すると外部結合付きの
+    SQL になりエラーになる。id 列だけを選択して予約本体の行だけをロックする。
+
+    SQLite（ローカル開発用）: FOR UPDATE が無いため、同じ行への空 UPDATE で
+    DB の書き込みロックを取って同じく直列化する。
+    """
+    if db.engine.dialect.name == "sqlite":
+        result = db.session.execute(
+            text("UPDATE event SET id = id WHERE id = :id"), {"id": event_id}
+        )
+        return result.rowcount == 1
+    locked_id = db.session.execute(
+        select(Event.id).where(Event.id == event_id).with_for_update()
+    ).scalar_one_or_none()
+    return locked_id is not None
+
+
+def count_attending(event_id):
+    return db.session.scalar(
+        select(func.count())
+        .select_from(Participant)
+        .where(Participant.event_id == event_id, Participant.attending.is_(True))
+    )
+
+
+def save_attendance(event_id, name, status):
+    """1 人分の出欠を保存して commit する。
+
+    呼び出し側で status (ATTENDANCE_STATUSES) とメンバーの存在を検証しておくこと。
+    予約の行をロックしてから現在の出欠と参加人数を読み直すので、同時に
+    実行されても定員を超えず、change_version の加算も取りこぼさない。
+    読み直しはロック取得後の新しい SQL で行う（PostgreSQL の既定
+    READ COMMITTED では各 SQL が開始時点の確定済みデータを見る）。
+
+    戻り値: {"attending_count", "change_version", "changed"}
+    例外 (いずれもロールバック済み): EventNotFoundError / EventFullError
+    """
+    if not lock_event_row(event_id):
+        db.session.rollback()
+        raise EventNotFoundError()
+
+    # 同じセッションで以前に読み込んだ古い値を使わないよう populate_existing で読み直す。
+    participant = (
+        Participant.query.filter_by(event_id=event_id, name=name)
+        .populate_existing()
+        .first()
+    )
+    if participant is None:
+        previous_status = "undecided"
+    else:
+        previous_status = "attend" if participant.attending else "absent"
+
+    changed = status != previous_status
+    if changed:
+        if status == "attend" and count_attending(event_id) >= MAX_PARTICIPANTS:
+            db.session.rollback()
+            raise EventFullError()
+
+        if status == "undecided":
+            db.session.delete(participant)
+        elif participant is not None:
+            participant.attending = status == "attend"
+        else:
+            db.session.add(Participant(event_id=event_id, name=name, attending=status == "attend"))
+
+        # DB 側で加算する（読み込んだ値 +1 を書き戻さない）。
+        db.session.execute(
+            update(Event)
+            .where(Event.id == event_id)
+            .values(change_version=func.coalesce(Event.change_version, 0) + 1)
+            .execution_options(synchronize_session=False)
+        )
+
+    # ロック中に最新の値を読む（未 flush の変更は autoflush で反映される）。
+    attending_count = count_attending(event_id)
+    change_version = db.session.scalar(select(Event.change_version).where(Event.id == event_id))
+    db.session.commit()
+    return {
+        "attending_count": attending_count,
+        "change_version": change_version or 0,
+        "changed": changed,
+    }
+
+
 @app.route("/event/<int:event_id>", methods=["GET", "POST"])
 def event_detail(event_id):
     event = Event.query.get_or_404(event_id)
@@ -555,28 +665,17 @@ def event_detail(event_id):
         status = request.form.get("status", "")
 
         member = Member.query.filter_by(name=name).first()
-        participant = Participant.query.filter_by(event_id=event.id, name=name).first()
 
         if not member:
             error_message = "メンバーが見つかりません。"
-        elif status == "undecided":
-            if participant:
-                db.session.delete(participant)
-                db.session.commit()
-            return redirect(url_for("event_detail", event_id=event.id))
-        elif status in ("attend", "absent"):
-            attending = status == "attend"
-            already_attending = participant.attending if participant else False
-
-            if attending and not already_attending and event.attending_count >= MAX_PARTICIPANTS:
-                error_message = f"参加は最大 {MAX_PARTICIPANTS} 名までです。"
+        elif status in ATTENDANCE_STATUSES:
+            try:
+                save_attendance(event.id, name, status)
+            except EventNotFoundError:
+                abort(404)
+            except EventFullError:
+                error_message = EVENT_FULL_MESSAGE
             else:
-                if participant:
-                    participant.attending = attending
-                else:
-                    participant = Participant(event=event, name=name, attending=attending)
-                    db.session.add(participant)
-                db.session.commit()
                 return redirect(url_for("event_detail", event_id=event.id))
         else:
             error_message = "不正な操作です。"
@@ -606,55 +705,31 @@ def update_attendance(event_id):
     name = request.form.get("member_name", "").strip()
     status = request.form.get("status", "")
 
-    if status not in ("attend", "absent", "undecided"):
+    if status not in ATTENDANCE_STATUSES:
         return jsonify({"ok": False, "error": "不正な操作です。"}), 400
 
-    event = Event.query.filter_by(id=event_id).first()
-    if not event:
-        return jsonify({"ok": False, "error": "予約が見つかりません。"}), 404
+    event_not_found = (jsonify({"ok": False, "error": "予約が見つかりません。"}), 404)
+    if not db.session.query(Event.id).filter_by(id=event_id).first():
+        return event_not_found
 
     member_exists = Member.query.with_entities(Member.id).filter_by(name=name).first()
     if not member_exists:
         return jsonify({"ok": False, "error": "メンバーが見つかりません。"}), 400
 
-    participant = Participant.query.filter_by(event_id=event_id, name=name).first()
-    previous_status = "undecided"
-    if participant:
-        previous_status = "attend" if participant.attending else "absent"
+    try:
+        result = save_attendance(event_id, name, status)
+    except EventNotFoundError:
+        return event_not_found
+    except EventFullError:
+        return jsonify({"ok": False, "error": EVENT_FULL_MESSAGE}), 400
 
-    if status == "undecided":
-        if participant:
-            db.session.delete(participant)
-    else:
-        attending = status == "attend"
-        already_attending = participant.attending if participant else False
-
-        if attending and not already_attending:
-            attending_count = Participant.query.filter_by(event_id=event_id, attending=True).count()
-            if attending_count >= MAX_PARTICIPANTS:
-                return jsonify({
-                    "ok": False,
-                    "error": f"参加は最大 {MAX_PARTICIPANTS} 名までです。",
-                }), 400
-
-        if participant:
-            participant.attending = attending
-        else:
-            db.session.add(Participant(event_id=event_id, name=name, attending=attending))
-
-    if status != previous_status:
-        event.change_version = (event.change_version or 0) + 1
-
-    db.session.commit()
-
-    attending_count = Participant.query.filter_by(event_id=event_id, attending=True).count()
     return jsonify({
         "ok": True,
         "name": name,
         "status": status,
-        "attending_count": attending_count,
+        "attending_count": result["attending_count"],
         "max_participants": MAX_PARTICIPANTS,
-        "change_version": event.change_version or 0,
+        "change_version": result["change_version"],
     })
 
 
@@ -672,16 +747,19 @@ def update_event_status(event_id):
     if status not in EVENT_STATUSES:
         return jsonify({"ok": False, "error": "不正な操作です。"}), 400
 
-    event = Event.query.filter_by(id=event_id).first()
-    if not event:
+    # 出欠更新と同じく予約の行をロックしてから最新の状態を読み直す。
+    # 同時に出欠や開催状況が変わっても change_version の加算を取りこぼさない。
+    if not lock_event_row(event_id):
+        db.session.rollback()
         return jsonify({"ok": False, "error": "予約が見つかりません。"}), 404
+    event = db.session.get(Event, event_id, populate_existing=True)
 
     note = note[:200]
     changed = (event.status or "scheduled") != status or (event.status_note or "") != note
 
     event.status = status
     event.status_note = note or None
-    event.status_updated_at = now_jst()
+    event.status_updated_at = now_jst_naive()
     if changed:
         event.change_version = (event.change_version or 0) + 1
 
